@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "gaoya",
+    "py-gaoya"
+]

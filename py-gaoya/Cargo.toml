@@ -1,0 +1,60 @@
+[package]
+name = "pygaoya"
+version = "0.1.0"
+authors = ["Sergejs Melderis <sergejs.melderis@sinch.com>"]
+edition = "2018"
+
+
+
+[lib]
+name = "gaoya"
+crate-type = ["cdylib"]
+
+[package.metadata.release]
+no-dev-version = true
+disable-publish = true
+
+[package.metadata.maturin]
+name = "gaoya"
+classifier = [
+    "Programming Language :: Rust",
+    "Operating System :: POSIX :: Linux",
+]
+
+[dependencies]
+libc = "0.2"
+pyo3 = { version = "0.13.2", features = ["extension-module"] }
+rayon = "1.5.0"
+
+[dependencies.gaoya]
+version = "*"
+path = "../gaoya"
+
+[dev-dependencies]
+tempfile = "3.1"
+
+[target.x86_64-apple-darwin]
+rustflags = [
+    "-C", "link-arg=-undefined",
+    "-C", "link-arg=dynamic_lookup",
+]
+
+[profile.release]
+# Enable link-time optimization, eliminates more code and inlines across crate boundaries.
+# Default: false
+lto = "fat"
+
+# codegen-units of 1 gives best optimization, but disables parallel building.
+# Default: 16
+#codegen-units = 1
+
+# Includes debug information in release builds. Necessary for profiling. Does not
+# slow down the executable.
+debug = true
+
+# The default optimization level is 3 for release mode builds.
+# 0 means disable optimization and is the default for debug mode buids.
+# (Setting opt-level=1 for debug builds is a good way of speeding them up a bit.)
+# "s" means optimize for size, "z" reduces size even more.
+opt-level = 3
+
