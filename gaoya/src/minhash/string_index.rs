@@ -6,9 +6,9 @@ use std::io::{Read, Write};
 use std::fmt::{Display, Formatter};
 use std::fmt;
 use rayon::prelude::*;
-use crate::minhash::{MinHash64, MinHashIndex, tokenize_text};
+use crate::minhash::{MinHash64, MinHashIndex};
 use crate::minhash::min_hash64::MinHash64V1;
-
+use crate::text::tokenize_text;
 pub struct MinHashStringIndex {
     lsh_index: MinHashIndex<u64,u64>,
     min_hash: MinHash64V1,

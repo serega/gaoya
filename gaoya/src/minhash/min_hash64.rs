@@ -136,7 +136,8 @@ mod tests {
     use super::MinHash64V1;
 
     use std::f64;
-    use crate::minhash::{compute_jaccard_similarity, tokenize_text, MinHash64, centroid_minhash};
+    use crate::minhash::{compute_jaccard_similarity, MinHash64, centroid_minhash};
+    use crate::text::tokenize_text;
 
     static S1: &'static str = "local sensitive hashing is cool";
     static S2: &'static str = "local sensitive hashing is great";

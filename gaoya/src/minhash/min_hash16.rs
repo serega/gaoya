@@ -96,7 +96,8 @@ impl MinHash16 for MinHash16V1 {
 mod tests {
 
     use std::f64;
-    use crate::minhash::{compute_jaccard_similarity, tokenize_text, MinHash64, centroid_minhash, MinHash16V1, MinHash16};
+    use crate::minhash::{compute_jaccard_similarity, MinHash64, centroid_minhash, MinHash16V1, MinHash16};
+    use crate::text::tokenize_text;
 
     static S1: &'static str = "local sensitive hashing is cool";
     static S2: &'static str = "local sensitive hashing is great";

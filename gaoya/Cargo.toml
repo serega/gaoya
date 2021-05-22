@@ -5,6 +5,9 @@ authors = ["Sergejs Melderis <sergey.melderis@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[profile.release]
+debug = true
+
 
 [lib]
 name = "gaoya"
@@ -20,3 +23,8 @@ random_choice = "0.3.2"
 fxhash = "0.2.1"
 rayon = "1.5.0"
 seahash = "4.0.1"
+itertools = "0.10.0"
+num = "0.4.0"
+
+
+

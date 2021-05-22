@@ -31,7 +31,6 @@ pub trait MinHash32 {
     {
         compute_minhash_similarity(&self.create_signature(iter_1), &self.create_signature(iter_2))
     }
-
 }
 
 pub struct MinHash32V1 {
@@ -294,8 +293,9 @@ mod tests {
 
     use std::f64;
     use std::cmp::min;
-    use crate::minhash::{tokenize_text, compute_jaccard_similarity};
+    use crate::minhash::{compute_jaccard_similarity};
     use crate::minhash::compute_minhash_similarity;
+    use crate::text::tokenize_text;
 
     static S1: &'static str = "local sensitive hashing is cool";
     static S2: &'static str = "local sensitive hashing is great";
@@ -330,8 +330,6 @@ mod tests {
         test_min_hash(&min_hash);
     }
 
-
-
     fn test_min_hash<M: MinHash32>(min_hash: &M) {
         let similarity = min_hash.compute_similarity(tokenize_text(S10), tokenize_text(S11)) as f32;
         let actual_similarity = compute_jaccard_similarity(tokenize_text(S10), tokenize_text(S11));
@@ -342,6 +340,5 @@ mod tests {
         let actual_similarity = compute_jaccard_similarity(tokenize_text(S1), tokenize_text(S3)) ;
         println!("actual {} estimated {}", actual_similarity,  estimated_similarity);
         assert!(f32::abs(estimated_similarity - actual_similarity) < 0.15);
-
     }
 }
