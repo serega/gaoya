@@ -79,11 +79,16 @@ impl MinHash32 for MinHash32V1 {
             hasher.finish() as u32
         }).collect::<Vec<_>>();
 
-        self.a.iter().zip(self.b.iter()).map(|ab| {
-            hashes.iter().map(|hash| {
-                hash.wrapping_mul(*ab.0).wrapping_add(*ab.1) % MERSENNE_PRIME_31
-            }).min().unwrap()
-        }).collect()
+        match hashes.len() {
+            len if len > 0 => {
+                self.a.iter().zip(self.b.iter()).map(|ab| {
+                    hashes.iter().map(|hash| {
+                        hash.wrapping_mul(*ab.0).wrapping_add(*ab.1) % MERSENNE_PRIME_31
+                    }).min().unwrap()
+                }).collect()
+            },
+            _ => vec![0; self.num_hashes]
+        }
     }
 }
 
@@ -132,13 +137,18 @@ impl MinHash32 for MinHash32V2 {
             hasher.finish()
         }).collect::<Vec<_>>();
 
-        self.a.iter().zip(self.b.iter()).map(|ab| {
-            hashes.iter().map(|hash| {
-                let x = hash.wrapping_mul(*ab.0).wrapping_add(*ab.1);
-                (x % MERSENNE_PRIME_61) as u32
-                //((x & MERSENNE_PRIME_61) + (x >> 61)) as u32
-            }).min().unwrap()
-        }).collect()
+        match hashes.len() {
+            len if len > 0 => {
+                self.a.iter().zip(self.b.iter()).map(|ab| {
+                    hashes.iter().map(|hash| {
+                        let x = hash.wrapping_mul(*ab.0).wrapping_add(*ab.1);
+                        (x % MERSENNE_PRIME_61) as u32
+                        //((x & MERSENNE_PRIME_61) + (x >> 61)) as u32
+                    }).min().unwrap()
+                }).collect()
+            },
+            _ => vec![0; self.num_hashes]
+        }
     }
 }
 

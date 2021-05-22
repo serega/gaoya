@@ -77,11 +77,16 @@ impl MinHash16 for MinHash16V1 {
             hasher.finish() as u32
         }).collect::<Vec<_>>();
 
-        self.a.iter().zip(self.b.iter()).map(|ab| {
-            hashes.iter().map(|hash| {
-                (hash.wrapping_mul(*ab.0).wrapping_add(*ab.1) % MERSENNE_PRIME_31) as u16
-            }).min().unwrap()
-        }).collect()
+        match hashes.len() {
+            len if len > 0 => {
+                self.a.iter().zip(self.b.iter()).map(|ab| {
+                    hashes.iter().map(|hash| {
+                        (hash.wrapping_mul(*ab.0).wrapping_add(*ab.1) % MERSENNE_PRIME_31) as u16
+                    }).min().unwrap()
+                }).collect()
+            },
+            _ => vec![0; self.num_hashes]
+        }
     }
 }
 

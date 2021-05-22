@@ -85,11 +85,13 @@ impl MinHash64V1 {
             hasher.finish()
         }).collect::<Vec<_>>();
 
-        for index in 0..self.num_hashes {
-            let m = hashes.iter().map(|hash| {
-                hash.wrapping_mul(self.a[index]).wrapping_add(self.b[index]) % MERSENNE_PRIME
-            }).min().unwrap();
-            ret[index] = m;
+        if hashes.len() > 0 {
+            for index in 0..self.num_hashes {
+                let m = hashes.iter().map(|hash| {
+                    hash.wrapping_mul(self.a[index]).wrapping_add(self.b[index]) % MERSENNE_PRIME
+                }).min().unwrap();
+                ret[index] = m;
+            }
         }
     }
 
@@ -108,11 +110,17 @@ impl MinHash64 for MinHash64V1 {
             hasher.finish()
         }).collect::<Vec<_>>();
 
-        self.a.iter().zip(self.b.iter()).map(|ab| {
-            hashes.iter().map(|hash| {
-                hash.wrapping_mul(*ab.0).wrapping_add(*ab.1) % MERSENNE_PRIME
-            }).min().unwrap()
-        }).collect()
+        match hashes.len() {
+            len if len > 0 => {
+                self.a.iter().zip(self.b.iter()).map(|ab| {
+                    hashes.iter().map(|hash| {
+                        hash.wrapping_mul(*ab.0).wrapping_add(*ab.1) % MERSENNE_PRIME
+                    }).min().unwrap()
+                }).collect()
+            },
+            _ => vec![0; self.num_hashes]
+        }
+
     }
 
     fn bulk_create_signature<U>(&self, batch: &Vec<Vec<U>>) -> Vec<Vec<u64>>
