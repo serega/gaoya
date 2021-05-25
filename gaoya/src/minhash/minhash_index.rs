@@ -318,9 +318,16 @@ where
         for band in &self.bands {
             band.query(query_signature, &mut match_ids);
         }
+
         if self.removed_ids.len() > 0 {
             match_ids.retain(|item| !self.removed_ids.contains(item));
         }
+
+        match_ids.retain(|id| {
+            let signature = &self.id_signatures[id];
+            compute_minhash_distance(signature, query_signature) < self.threshold
+        });
+
         match_ids
     }
 
@@ -334,6 +341,10 @@ where
         if self.removed_ids.len() > 0 {
             match_ids.retain(|item| !self.removed_ids.contains(item));
         }
+        match_ids.retain(|id| {
+            let signature = &self.id_signatures[id];
+            compute_minhash_distance(signature, query_signature) < self.threshold
+        });
         match_ids
     }
 
