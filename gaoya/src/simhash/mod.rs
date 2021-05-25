@@ -2,7 +2,6 @@ mod sim_hash;
 mod sim_hasher;
 mod sim_hash_index;
 mod permutation;
-mod sim_hash_index_simple;
 
 pub use self::sim_hash_index::SimHashIndex;
 pub use self::sim_hash_index::SimHashTable;
