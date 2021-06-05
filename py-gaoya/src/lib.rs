@@ -6,7 +6,6 @@ mod sim_hash;
 use min_hash::init_minhash_module;
 use sim_hash::init_simhash_module;
 
-
 #[pymodule]
 fn gaoya(py: Python, module: &PyModule) -> PyResult<()> {
     let minhash_module = PyModule::new(py, "minhash")?;

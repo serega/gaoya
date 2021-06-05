@@ -1,47 +1,55 @@
 use crate::minhash::hashers::Hashers;
-use std::collections::HashMap;
-use std::io::{BufReader, BufRead, Error};
-use std::fs::File;
-use std::io::{Read, Write};
-use std::fmt::{Display, Formatter};
-use std::fmt;
-use rayon::prelude::*;
-use crate::minhash::{MinHash64, MinHashIndex};
 use crate::minhash::min_hash64::MinHash64V1;
+use crate::minhash::{MinHash64, MinHashIndex};
 use crate::text::tokenize_text;
+use rayon::prelude::*;
+use std::collections::HashMap;
+use std::fmt;
+use std::fmt::{Display, Formatter};
+use std::fs::File;
+use std::io::{BufRead, BufReader, Error};
+use std::io::{Read, Write};
 pub struct MinHashStringIndex {
-    lsh_index: MinHashIndex<u64,u64>,
+    lsh_index: MinHashIndex<u64, u64>,
     min_hash: MinHash64V1,
     doc_map: HashMap<u64, String>,
-    doc_id: u64
+    doc_id: u64,
 }
-
 
 impl Display for MinHashStringIndex {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "MinHashStringIndex {{ ");
         self.lsh_index.fmt(f);
-        write!(f, ", hasher = {} }}", self.min_hash.get_hasher().to_string())
+        write!(
+            f,
+            ", hasher = {} }}",
+            self.min_hash.get_hasher().to_string()
+        )
     }
 }
 
-impl MinHashStringIndex{
-
+impl MinHashStringIndex {
     pub fn new(threshold: f64, num_perm: usize, fpw: f64, fnw: f64) -> Self {
         MinHashStringIndex {
             lsh_index: MinHashIndex::new_with_weights(threshold, num_perm, fpw, fnw),
             min_hash: MinHash64V1::new(num_perm),
             doc_map: HashMap::new(),
-            doc_id: 0
+            doc_id: 0,
         }
     }
 
-    pub fn new_with_hasher(threshold: f64, num_perm: usize, fpw: f64, fnw: f64, hashers: Hashers) -> Self {
+    pub fn new_with_hasher(
+        threshold: f64,
+        num_perm: usize,
+        fpw: f64,
+        fnw: f64,
+        hashers: Hashers,
+    ) -> Self {
         MinHashStringIndex {
             lsh_index: MinHashIndex::new_with_weights(threshold, num_perm, fpw, fnw),
             min_hash: MinHash64V1::new_with_hasher(num_perm, hashers),
             doc_map: HashMap::new(),
-            doc_id: 0
+            doc_id: 0,
         }
     }
 
@@ -67,7 +75,7 @@ impl MinHashStringIndex{
         }
     }
 
-     pub fn load_from_file(&mut self, file_name: &str) -> Result<usize, Error> {
+    pub fn load_from_file(&mut self, file_name: &str) -> Result<usize, Error> {
         match File::open(file_name) {
             Ok(file) => {
                 let current_size = self.size();
@@ -75,10 +83,8 @@ impl MinHashStringIndex{
                 self.load_from_lines(&mut reader);
                 let new_count = self.size() - current_size;
                 Ok(new_count)
-            },
-            Err(e) => {
-                Err(e)
             }
+            Err(e) => Err(e),
         }
     }
 
@@ -87,14 +93,20 @@ impl MinHashStringIndex{
             Ok(file) => {
                 let current_size = self.size();
                 let mut reader: BufReader<File> = BufReader::new(file);
-                let lines: Vec<(u64, String)> = reader.lines()
+                let lines: Vec<(u64, String)> = reader
+                    .lines()
                     .enumerate()
-                    .map(|v| (v.0 as u64 + self.doc_id , v.1.unwrap()))
+                    .map(|v| (v.0 as u64 + self.doc_id, v.1.unwrap()))
                     .collect();
-                let minhashes = lines.par_iter()
+                let minhashes = lines
+                    .par_iter()
                     .map(|line| {
-                        (line.0, self.min_hash.create_signature(tokenize_text(&line.1)))
-                    }).collect();
+                        (
+                            line.0,
+                            self.min_hash.create_signature(tokenize_text(&line.1)),
+                        )
+                    })
+                    .collect();
                 self.lsh_index.par_bulk_insert_pairs(minhashes);
                 self.doc_id += lines.len() as u64;
                 for line in lines {
@@ -102,13 +114,10 @@ impl MinHashStringIndex{
                 }
                 let new_count = self.size() - current_size;
                 Ok(new_count)
-            },
-            Err(e) => {
-                Err(e)
             }
+            Err(e) => Err(e),
         }
     }
-
 
     pub fn size(&self) -> usize {
         return self.doc_id as usize;
@@ -117,8 +126,8 @@ impl MinHashStringIndex{
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Read, Write, BufReader};
     use super::MinHashStringIndex;
+    use std::io::{BufReader, Read, Write};
 
     #[test]
     fn test_load_from_file() {
@@ -128,8 +137,11 @@ mod tests {
             "locality sensitive hashing is a awesome algorithm",
             "we all scream for ice cream",
             "we all scream for ice cream",
-            "we all scream for ice cream sandwich"
-        ].iter().map(|s| s.to_string()).collect();
+            "we all scream for ice cream sandwich",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
 
         // Create fake "file"
         let mut file = Vec::new();
@@ -154,6 +166,3 @@ mod tests {
         assert!(result.contains(&(&strings[2])));
     }
 }
-
-
-

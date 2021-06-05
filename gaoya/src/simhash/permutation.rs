@@ -1,33 +1,31 @@
+use crate::simhash::SimHashBits;
+use core::mem;
 use itertools::Itertools;
 use std::fmt::Debug;
 use std::ops::BitOrAssign;
-use core::mem;
-use crate::simhash::SimHashBits;
-
 
 #[derive(Debug)]
 pub struct Permutation<S>
-    where
-        S: SimHashBits {
+where
+    S: SimHashBits,
+{
     offsets_masks: Vec<(S, isize)>,
     search_mask: S,
     pub simple_mask: S,
-    pub width: usize
+    pub width: usize,
 }
 
-
 impl<S> Permutation<S>
-    where
-        S: SimHashBits  {
-
-    pub fn new(diff_bits : usize, masks: Vec<S>, choice: Vec<S>) -> Self {
+where
+    S: SimHashBits,
+{
+    pub fn new(diff_bits: usize, masks: Vec<S>, choice: Vec<S>) -> Self {
         let len = masks.len();
         let mut p = Permutation {
-            offsets_masks : Vec::new(),
-            search_mask : S::zero(),
+            offsets_masks: Vec::new(),
+            search_mask: S::zero(),
             simple_mask: S::zero(),
             width: 0,
-
         };
 
         let type_width = S::bit_length();
@@ -55,7 +53,7 @@ impl<S> Permutation<S>
 
             let offset: isize = type_width as isize - width as isize - i as isize;
             offsets[mask_index] = offset;
-        };
+        }
 
         //println!("{:?}", widths);
 
@@ -78,8 +76,8 @@ impl<S> Permutation<S>
     }
 
     pub fn create(num_blocks: usize, diff_bits: usize) -> Vec<Permutation<S>>
-        where
-            S: SimHashBits
+    where
+        S: SimHashBits,
     {
         let mut permutations = Vec::new();
         let mut blocks = Vec::new();
@@ -102,13 +100,12 @@ impl<S> Permutation<S>
                     all_blocks.push(v.clone());
                 }
             }
-            permutations.push(Permutation::new(diff_bits, all_blocks,  combination));
+            permutations.push(Permutation::new(diff_bits, all_blocks, combination));
         }
-        return permutations
+        return permutations;
     }
 
-    pub fn permute(&self, sim_hash: &S) -> S
-    {
+    pub fn permute(&self, sim_hash: &S) -> S {
         let mut result: S = S::zero();
 
         for pair in &self.offsets_masks {
@@ -118,19 +115,16 @@ impl<S> Permutation<S>
             if offset > 0 {
                 result = result | (*sim_hash & mask) << offset as usize;
             } else {
-                result = result |  (*sim_hash & mask) >> (0 - offset) as usize;
+                result = result | (*sim_hash & mask) >> (0 - offset) as usize;
             }
         }
         result & self.search_mask
     }
-
 }
 
 #[cfg(test)]
 mod tests {
     use super::Permutation;
-
-
 
     #[test]
     pub fn test_permutations() {
@@ -161,7 +155,4 @@ mod tests {
         println!("{:b}", p.search_mask);
         println!("{:b}", p.permute(&u));
     }
-
-
 }
-

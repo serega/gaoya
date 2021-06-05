@@ -1,31 +1,47 @@
 use pyo3::prelude::*;
 use pyo3::PyObjectProtocol;
 
-use rayon::prelude::*;
-use gaoya::minhash::{MinHash32V2, MinHash32, MinHash16V1, compute_jaccard_similarity, Hashers, MinHash64V1, MinHash16, MinHash64};
+use gaoya::minhash::{
+    compute_jaccard_similarity, Hashers, MinHash16, MinHash16V1, MinHash32, MinHash32V2, MinHash64,
+    MinHash64V1,
+};
 use gaoya::text::tokenize_text;
 use pyo3::exceptions::PyValueError;
+use rayon::prelude::*;
 
 extern crate gaoya;
 
 #[pyclass]
 struct Minhash64StringIntIndex {
     inner: gaoya::minhash::MinHashIndex<u64, i64>,
-    min_hash: MinHash64V1
+    min_hash: MinHash64V1,
 }
 
 #[pymethods]
 impl Minhash64StringIntIndex {
-
     #[new]
-    #[args(threshold = "0.5", num_perm = "128", fpw = "0.5", fnw = "0.5", hashfunc = "\"sip\"")]
-    pub fn new(threshold: f64, num_perm: usize, fpw: f64, fnw: f64, hashfunc: &str) -> PyResult<Self> {
+    #[args(
+        threshold = "0.5",
+        num_perm = "128",
+        fpw = "0.5",
+        fnw = "0.5",
+        hashfunc = "\"sip\""
+    )]
+    pub fn new(
+        threshold: f64,
+        num_perm: usize,
+        fpw: f64,
+        fnw: f64,
+        hashfunc: &str,
+    ) -> PyResult<Self> {
         match Hashers::from_str(hashfunc) {
             Err(e) => Err(PyValueError::new_err(e)),
             Ok(hasher) => {
                 let index = Minhash64StringIntIndex {
-                    inner: gaoya::minhash::MinHashIndex::new_with_weights(threshold, num_perm, fpw, fnw),
-                    min_hash: MinHash64V1::new_with_hasher(num_perm, hasher)
+                    inner: gaoya::minhash::MinHashIndex::new_with_weights(
+                        threshold, num_perm, fpw, fnw,
+                    ),
+                    min_hash: MinHash64V1::new_with_hasher(num_perm, hasher),
                 };
                 Ok(index)
             }
@@ -33,22 +49,31 @@ impl Minhash64StringIntIndex {
     }
 
     pub fn insert_document(&mut self, id: i64, doc: String) {
-        self.inner.insert(id, self.min_hash.create_signature(tokenize_text(doc.as_str())));
+        self.inner.insert(
+            id,
+            self.min_hash.create_signature(tokenize_text(doc.as_str())),
+        );
     }
 
     pub fn insert_tokens(&mut self, id: i64, tokens: Vec<&str>) {
-        self.inner.insert(id, self.min_hash.create_signature(tokens.iter()));
+        self.inner
+            .insert(id, self.min_hash.create_signature(tokens.iter()));
     }
 
     pub fn par_bulk_insert_docs(&mut self, ids: Vec<i64>, docs: Vec<&str>) {
-        let docs_tokens = docs.par_iter()
-            .map(|doc| tokenize_text(doc).collect()).collect();
+        let docs_tokens = docs
+            .par_iter()
+            .map(|doc| tokenize_text(doc).collect())
+            .collect();
         self.par_bulk_insert_tokens(ids, docs_tokens);
     }
 
     pub fn bulk_insert_tokens(&mut self, ids: Vec<i64>, tokens: Vec<Vec<&str>>) {
         for id_tokens in ids.iter().zip(tokens.iter()) {
-            self.inner.insert(*id_tokens.0, self.min_hash.create_signature(id_tokens.1.iter()));
+            self.inner.insert(
+                *id_tokens.0,
+                self.min_hash.create_signature(id_tokens.1.iter()),
+            );
         }
     }
 
@@ -74,7 +99,7 @@ impl Minhash64StringIntIndex {
 
 #[pyproto]
 impl PyObjectProtocol for Minhash64StringIntIndex {
-    fn __str__(&self) -> PyResult<String>   {
+    fn __str__(&self) -> PyResult<String> {
         Ok(format!("{}", self.inner))
     }
 
@@ -83,25 +108,37 @@ impl PyObjectProtocol for Minhash64StringIntIndex {
     }
 }
 
-
 #[pyclass]
 struct MinHash32StringIntIndex {
     inner: gaoya::minhash::MinHashIndex<u32, i64>,
-    min_hash: MinHash32V2
+    min_hash: MinHash32V2,
 }
 
 #[pymethods]
 impl MinHash32StringIntIndex {
-
     #[new]
-    #[args(threshold = "0.5", num_perm = "128", fpw = "0.5", fnw = "0.5", hashfunc = "\"sip\"")]
-    pub fn new(threshold: f64, num_perm: usize, fpw: f64, fnw: f64, hashfunc: &str) -> PyResult<Self> {
+    #[args(
+        threshold = "0.5",
+        num_perm = "128",
+        fpw = "0.5",
+        fnw = "0.5",
+        hashfunc = "\"sip\""
+    )]
+    pub fn new(
+        threshold: f64,
+        num_perm: usize,
+        fpw: f64,
+        fnw: f64,
+        hashfunc: &str,
+    ) -> PyResult<Self> {
         match Hashers::from_str(hashfunc) {
             Err(e) => Err(PyValueError::new_err(e)),
             Ok(hasher) => {
                 let index = MinHash32StringIntIndex {
-                    inner: gaoya::minhash::MinHashIndex::new_with_weights(threshold, num_perm, fpw, fnw),
-                    min_hash: MinHash32V2::new_with_hasher(num_perm, hasher)
+                    inner: gaoya::minhash::MinHashIndex::new_with_weights(
+                        threshold, num_perm, fpw, fnw,
+                    ),
+                    min_hash: MinHash32V2::new_with_hasher(num_perm, hasher),
                 };
                 Ok(index)
             }
@@ -109,22 +146,31 @@ impl MinHash32StringIntIndex {
     }
 
     pub fn insert_document(&mut self, id: i64, doc: String) {
-        self.inner.insert(id, self.min_hash.create_signature(tokenize_text(doc.as_str())));
+        self.inner.insert(
+            id,
+            self.min_hash.create_signature(tokenize_text(doc.as_str())),
+        );
     }
 
     pub fn insert_tokens(&mut self, id: i64, tokens: Vec<&str>) {
-        self.inner.insert(id, self.min_hash.create_signature(tokens.iter()));
+        self.inner
+            .insert(id, self.min_hash.create_signature(tokens.iter()));
     }
 
     pub fn par_bulk_insert_docs(&mut self, ids: Vec<i64>, docs: Vec<&str>) {
-        let docs_tokens = docs.par_iter()
-            .map(|doc| tokenize_text(doc).collect()).collect();
+        let docs_tokens = docs
+            .par_iter()
+            .map(|doc| tokenize_text(doc).collect())
+            .collect();
         self.par_bulk_insert_tokens(ids, docs_tokens);
     }
 
     pub fn bulk_insert_tokens(&mut self, ids: Vec<i64>, tokens: Vec<Vec<&str>>) {
         for id_tokens in ids.iter().zip(tokens.iter()) {
-            self.inner.insert(*id_tokens.0, self.min_hash.create_signature(id_tokens.1.iter()));
+            self.inner.insert(
+                *id_tokens.0,
+                self.min_hash.create_signature(id_tokens.1.iter()),
+            );
         }
     }
 
@@ -150,7 +196,7 @@ impl MinHash32StringIntIndex {
 
 #[pyproto]
 impl PyObjectProtocol for MinHash32StringIntIndex {
-    fn __str__(&self) -> PyResult<String>   {
+    fn __str__(&self) -> PyResult<String> {
         Ok(format!("{}", self.inner))
     }
 
@@ -159,26 +205,37 @@ impl PyObjectProtocol for MinHash32StringIntIndex {
     }
 }
 
-
-
 #[pyclass]
 struct MinHash16StringIntIndex {
     inner: gaoya::minhash::MinHashIndex<u16, i64>,
-    min_hash: MinHash16V1
+    min_hash: MinHash16V1,
 }
 
 #[pymethods]
 impl MinHash16StringIntIndex {
-
     #[new]
-    #[args(threshold = "0.5", num_perm = "128", fpw = "0.5", fnw = "0.5", hashfunc = "\"sip\"")]
-    pub fn new(threshold: f64, num_perm: usize, fpw: f64, fnw: f64, hashfunc: &str) -> PyResult<Self> {
+    #[args(
+        threshold = "0.5",
+        num_perm = "128",
+        fpw = "0.5",
+        fnw = "0.5",
+        hashfunc = "\"sip\""
+    )]
+    pub fn new(
+        threshold: f64,
+        num_perm: usize,
+        fpw: f64,
+        fnw: f64,
+        hashfunc: &str,
+    ) -> PyResult<Self> {
         match Hashers::from_str(hashfunc) {
             Err(e) => Err(PyValueError::new_err(e)),
             Ok(hasher) => {
                 let index = MinHash16StringIntIndex {
-                    inner: gaoya::minhash::MinHashIndex::new_with_weights(threshold, num_perm, fpw, fnw),
-                    min_hash: MinHash16V1::new_with_hasher(num_perm, hasher)
+                    inner: gaoya::minhash::MinHashIndex::new_with_weights(
+                        threshold, num_perm, fpw, fnw,
+                    ),
+                    min_hash: MinHash16V1::new_with_hasher(num_perm, hasher),
                 };
                 Ok(index)
             }
@@ -186,22 +243,31 @@ impl MinHash16StringIntIndex {
     }
 
     pub fn insert_document(&mut self, id: i64, doc: String) {
-        self.inner.insert(id, self.min_hash.create_signature(tokenize_text(doc.as_str())));
+        self.inner.insert(
+            id,
+            self.min_hash.create_signature(tokenize_text(doc.as_str())),
+        );
     }
 
     pub fn insert_tokens(&mut self, id: i64, tokens: Vec<&str>) {
-        self.inner.insert(id, self.min_hash.create_signature(tokens.iter()));
+        self.inner
+            .insert(id, self.min_hash.create_signature(tokens.iter()));
     }
 
     pub fn par_bulk_insert_docs(&mut self, ids: Vec<i64>, docs: Vec<&str>) {
-        let docs_tokens = docs.par_iter()
-            .map(|doc| tokenize_text(doc).collect()).collect();
+        let docs_tokens = docs
+            .par_iter()
+            .map(|doc| tokenize_text(doc).collect())
+            .collect();
         self.par_bulk_insert_tokens(ids, docs_tokens);
     }
 
     pub fn bulk_insert_tokens(&mut self, ids: Vec<i64>, tokens: Vec<Vec<&str>>) {
         for id_tokens in ids.iter().zip(tokens.iter()) {
-            self.inner.insert(*id_tokens.0, self.min_hash.create_signature(id_tokens.1.iter()));
+            self.inner.insert(
+                *id_tokens.0,
+                self.min_hash.create_signature(id_tokens.1.iter()),
+            );
         }
     }
 
@@ -227,7 +293,7 @@ impl MinHash16StringIntIndex {
 
 #[pyproto]
 impl PyObjectProtocol for MinHash16StringIntIndex {
-    fn __str__(&self) -> PyResult<String>   {
+    fn __str__(&self) -> PyResult<String> {
         Ok(format!("{}", self.inner))
     }
 
@@ -236,27 +302,37 @@ impl PyObjectProtocol for MinHash16StringIntIndex {
     }
 }
 
-
-
-
 #[pyclass]
 struct MinHash32IntIntIndex {
     inner: gaoya::minhash::MinHashIndex<u32, i32>,
-    min_hash: MinHash32V2
+    min_hash: MinHash32V2,
 }
 
 #[pymethods]
 impl MinHash32IntIntIndex {
-
     #[new]
-    #[args(threshold = "0.5", num_perm = "128", fpw = "0.5", fnw = "0.5", hashfunc = "\"sip\"")]
-    pub fn new(threshold: f64, num_perm: usize, fpw: f64, fnw: f64, hashfunc: &str) -> PyResult<Self> {
+    #[args(
+        threshold = "0.5",
+        num_perm = "128",
+        fpw = "0.5",
+        fnw = "0.5",
+        hashfunc = "\"sip\""
+    )]
+    pub fn new(
+        threshold: f64,
+        num_perm: usize,
+        fpw: f64,
+        fnw: f64,
+        hashfunc: &str,
+    ) -> PyResult<Self> {
         match Hashers::from_str(hashfunc) {
             Err(e) => Err(PyValueError::new_err(e)),
             Ok(hasher) => {
                 let index = MinHash32IntIntIndex {
-                    inner: gaoya::minhash::MinHashIndex::new_with_weights(threshold, num_perm, fpw, fnw),
-                    min_hash: MinHash32V2::new_with_hasher(num_perm, hasher)
+                    inner: gaoya::minhash::MinHashIndex::new_with_weights(
+                        threshold, num_perm, fpw, fnw,
+                    ),
+                    min_hash: MinHash32V2::new_with_hasher(num_perm, hasher),
                 };
                 Ok(index)
             }
@@ -270,21 +346,24 @@ impl MinHash32IntIntIndex {
             Ok(hasher) => {
                 let index = MinHash32IntIntIndex {
                     inner: gaoya::minhash::MinHashIndex::new_with_params(b, r),
-                    min_hash: MinHash32V2::new_with_hasher(num_perm, hasher)
+                    min_hash: MinHash32V2::new_with_hasher(num_perm, hasher),
                 };
                 Ok(index)
             }
         }
     }
 
-
-    pub fn insert(&mut self, id: i32, value: Vec<i32>, ) {
-        self.inner.insert(id, self.min_hash.create_signature(value.iter()));
+    pub fn insert(&mut self, id: i32, value: Vec<i32>) {
+        self.inner
+            .insert(id, self.min_hash.create_signature(value.iter()));
     }
 
     pub fn bulk_insert(&mut self, ids: Vec<i32>, tokens: Vec<Vec<i32>>) {
         for id_tokens in ids.iter().zip(tokens.iter()) {
-            self.inner.insert(*id_tokens.0, self.min_hash.create_signature(id_tokens.1.iter()));
+            self.inner.insert(
+                *id_tokens.0,
+                self.min_hash.create_signature(id_tokens.1.iter()),
+            );
         }
     }
 
@@ -295,32 +374,47 @@ impl MinHash32IntIntIndex {
 
     pub fn query(&self, value: Vec<i32>) -> Vec<i32> {
         let min_hashes = &self.min_hash.create_signature(value.iter());
-        self.inner.query(min_hashes)
-            .into_iter().map(|id| id.to_owned()).collect()
+        self.inner
+            .query(min_hashes)
+            .into_iter()
+            .map(|id| id.to_owned())
+            .collect()
     }
 
     pub fn query_top_k(&self, value: Vec<i32>, k: usize) -> Vec<i32> {
         let min_hashes = &self.min_hash.create_signature(value.iter());
-        self.inner.query_top_k(min_hashes, k).into_iter().map(|k| k.0).collect()
+        self.inner
+            .query_top_k(min_hashes, k)
+            .into_iter()
+            .map(|k| k.0)
+            .collect()
     }
 
     pub fn query_top_ks(&self, queries: Vec<Vec<i32>>, k: usize) -> Vec<Vec<i32>> {
-        queries.into_par_iter().map(|query| self.query_top_k(query, k.clone())).collect()
+        queries
+            .into_par_iter()
+            .map(|query| self.query_top_k(query, k.clone()))
+            .collect()
     }
-
 
     pub fn size(&self) -> usize {
         self.inner.size()
     }
 
-    pub fn bulk_compute_jaccard_similarity(&self, query: Vec<i32>, sets: Vec<Vec<i32>>) -> Vec<f32> {
-        sets.par_iter().map(|set| compute_jaccard_similarity(query.iter(), set.iter())).collect()
+    pub fn bulk_compute_jaccard_similarity(
+        &self,
+        query: Vec<i32>,
+        sets: Vec<Vec<i32>>,
+    ) -> Vec<f32> {
+        sets.par_iter()
+            .map(|set| compute_jaccard_similarity(query.iter(), set.iter()))
+            .collect()
     }
 }
 
 #[pyproto]
 impl PyObjectProtocol for MinHash32IntIntIndex {
-    fn __str__(&self) -> PyResult<String>   {
+    fn __str__(&self) -> PyResult<String> {
         Ok(format!("{}", self.inner))
     }
 

@@ -1,35 +1,41 @@
-use std::hash::{Hash, Hasher};
 use rand::{thread_rng, Rng, SeedableRng};
 use rand_pcg::Pcg32;
+use std::hash::{Hash, Hasher};
 
-use rand::distributions::{Distribution, Uniform};
+use crate::minhash::compute_minhash_similarity;
 use crate::minhash::hashers::Hashers;
-use std::collections::HashMap;
-use crate::minhash::{compute_minhash_similarity};
-use rayon::prelude::*;
+use rand::distributions::{Distribution, Uniform};
 use rand::seq::SliceRandom;
+use rayon::prelude::*;
 use std::cmp::min;
-
+use std::collections::HashMap;
 
 pub trait MinHash32 {
-
     fn create_signature<T, U>(&self, iter: T) -> Vec<u32>
-        where
-            T: Iterator<Item=U>,
-            U: Hash;
+    where
+        T: Iterator<Item = U>,
+        U: Hash;
 
     fn bulk_create_signature<U>(&self, batch: &Vec<Vec<U>>) -> Vec<Vec<u32>>
-        where
-            U: Hash + Sync, Self: Sync  {
-        batch.par_iter().map(|tokens| self.create_signature(tokens.iter())).collect()
+    where
+        U: Hash + Sync,
+        Self: Sync,
+    {
+        batch
+            .par_iter()
+            .map(|tokens| self.create_signature(tokens.iter()))
+            .collect()
     }
 
     fn compute_similarity<T, U>(&self, iter_1: T, iter_2: T) -> f64
-        where
-            T: Iterator<Item=U>,
-            U: Hash,
+    where
+        T: Iterator<Item = U>,
+        U: Hash,
     {
-        compute_minhash_similarity(&self.create_signature(iter_1), &self.create_signature(iter_2))
+        compute_minhash_similarity(
+            &self.create_signature(iter_1),
+            &self.create_signature(iter_2),
+        )
     }
 }
 
@@ -53,8 +59,12 @@ impl MinHash32V1 {
         let rand_range2 = Uniform::from(0..MERSENNE_PRIME_31);
         MinHash32V1 {
             hashers: hashers,
-            a: (0..num_hashes).map(|_| rand_range1.sample(&mut rng)).collect(),
-            b: (0..num_hashes).map(|_| rand_range2.sample(&mut rng)).collect(),
+            a: (0..num_hashes)
+                .map(|_| rand_range1.sample(&mut rng))
+                .collect(),
+            b: (0..num_hashes)
+                .map(|_| rand_range2.sample(&mut rng))
+                .collect(),
             num_hashes,
         }
     }
@@ -69,24 +79,35 @@ impl MinHash32V1 {
 }
 
 impl MinHash32 for MinHash32V1 {
-    fn create_signature<T, U>(&self, iter: T) -> Vec<u32> where
-        T: Iterator<Item=U>,
-        U: Hash {
-        let hashes: Vec<u32> = iter.map(|item| {
-            let mut hasher = self.hashers.new_hasher();
-            item.hash(&mut hasher);
-            hasher.finish() as u32
-        }).collect::<Vec<_>>();
+    fn create_signature<T, U>(&self, iter: T) -> Vec<u32>
+    where
+        T: Iterator<Item = U>,
+        U: Hash,
+    {
+        let hashes: Vec<u32> = iter
+            .map(|item| {
+                let mut hasher = self.hashers.new_hasher();
+                item.hash(&mut hasher);
+                hasher.finish() as u32
+            })
+            .collect::<Vec<_>>();
 
         match hashes.len() {
-            len if len > 0 => {
-                self.a.iter().zip(self.b.iter()).map(|ab| {
-                    hashes.iter().map(|hash| {
-                        hash.wrapping_mul(*ab.0).wrapping_add(*ab.1) % MERSENNE_PRIME_31
-                    }).min().unwrap()
-                }).collect()
-            },
-            _ => vec![0; self.num_hashes]
+            len if len > 0 => self
+                .a
+                .iter()
+                .zip(self.b.iter())
+                .map(|ab| {
+                    hashes
+                        .iter()
+                        .map(|hash| {
+                            hash.wrapping_mul(*ab.0).wrapping_add(*ab.1) % MERSENNE_PRIME_31
+                        })
+                        .min()
+                        .unwrap()
+                })
+                .collect(),
+            _ => vec![0; self.num_hashes],
         }
     }
 }
@@ -112,9 +133,13 @@ impl MinHash32V2 {
         let rand_range2 = Uniform::from(0..u32::max_value() as u64);
         MinHash32V2 {
             hashers: hashers,
-            a: (0..num_hashes).map(|_| rand_range1.sample(&mut rng)).collect(),
-            b: (0..num_hashes).map(|_| rand_range2.sample(&mut rng)).collect(),
-            num_hashes
+            a: (0..num_hashes)
+                .map(|_| rand_range1.sample(&mut rng))
+                .collect(),
+            b: (0..num_hashes)
+                .map(|_| rand_range2.sample(&mut rng))
+                .collect(),
+            num_hashes,
         }
     }
 
@@ -124,29 +149,38 @@ impl MinHash32V2 {
 }
 
 impl MinHash32 for MinHash32V2 {
-
     fn create_signature<T, U>(&self, iter: T) -> Vec<u32>
-        where
-            T: Iterator<Item = U>,
-            U: Hash,
+    where
+        T: Iterator<Item = U>,
+        U: Hash,
     {
-        let hashes: Vec<u64> = iter.map(|item| {
-            let mut hasher = self.hashers.new_hasher();
-            item.hash(&mut hasher);
-            hasher.finish()
-        }).collect::<Vec<_>>();
+        let hashes: Vec<u64> = iter
+            .map(|item| {
+                let mut hasher = self.hashers.new_hasher();
+                item.hash(&mut hasher);
+                hasher.finish()
+            })
+            .collect::<Vec<_>>();
 
         match hashes.len() {
             len if len > 0 => {
-                self.a.iter().zip(self.b.iter()).map(|ab| {
-                    hashes.iter().map(|hash| {
-                        let x = hash.wrapping_mul(*ab.0).wrapping_add(*ab.1);
-                        (x % MERSENNE_PRIME_61) as u32
-                        //((x & MERSENNE_PRIME_61) + (x >> 61)) as u32
-                    }).min().unwrap()
-                }).collect()
-            },
-            _ => vec![0; self.num_hashes]
+                self.a
+                    .iter()
+                    .zip(self.b.iter())
+                    .map(|ab| {
+                        hashes
+                            .iter()
+                            .map(|hash| {
+                                let x = hash.wrapping_mul(*ab.0).wrapping_add(*ab.1);
+                                (x % MERSENNE_PRIME_61) as u32
+                                //((x & MERSENNE_PRIME_61) + (x >> 61)) as u32
+                            })
+                            .min()
+                            .unwrap()
+                    })
+                    .collect()
+            }
+            _ => vec![0; self.num_hashes],
         }
     }
 }
@@ -168,22 +202,20 @@ impl SuperMinHash32V1 {
     pub fn new_with_hasher(num_hashes: usize, hashers: Hashers) -> Self {
         SuperMinHash32V1 {
             hashers: hashers,
-            num_hashes
+            num_hashes,
         }
     }
-
 
     pub fn get_hasher(&self) -> &Hashers {
         &self.hashers
     }
-
 }
 
 impl MinHash32 for SuperMinHash32V1 {
     fn create_signature<T, U>(&self, iter: T) -> Vec<u32>
-        where
-            T: Iterator<Item = U>,
-            U: Hash,
+    where
+        T: Iterator<Item = U>,
+        U: Hash,
     {
         let mut minhash = vec![99999999f32; self.num_hashes];
         for item in iter {
@@ -199,12 +231,10 @@ impl MinHash32 for SuperMinHash32V1 {
                 let x = minhash[j].min(r + p[j] as f32);
                 minhash[j] = x;
             }
-
         }
         minhash.into_iter().map(|h| h as u32).collect()
     }
 }
-
 
 pub struct SuperMinHash32V2 {
     hashers: Hashers,
@@ -219,7 +249,7 @@ impl SuperMinHash32V2 {
     pub fn new_with_hasher(num_hashes: usize, hashers: Hashers) -> Self {
         SuperMinHash32V2 {
             hashers: hashers,
-            num_hashes
+            num_hashes,
         }
     }
 
@@ -230,9 +260,9 @@ impl SuperMinHash32V2 {
 
 impl MinHash32 for SuperMinHash32V2 {
     fn create_signature<T, U>(&self, iter: T) -> Vec<u32>
-        where
-            T: Iterator<Item = U>,
-            U: Hash,
+    where
+        T: Iterator<Item = U>,
+        U: Hash,
     {
         let mut h = vec![99999999f32; self.num_hashes];
         let m = self.num_hashes;
@@ -264,7 +294,7 @@ impl MinHash32 for SuperMinHash32V2 {
                 p[j] = p[k];
                 p[k] = tmp_swap;
                 let rpj = r + (j as f32);
-                if rpj  < h[p[j]]  {
+                if rpj < h[p[j]] {
                     let j2 = min(h[p[j]] as usize, m - 1);
                     h[p[j]] = rpj;
                     if j < j2 {
@@ -282,7 +312,6 @@ impl MinHash32 for SuperMinHash32V2 {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::MinHash32;
@@ -291,20 +320,18 @@ mod tests {
     use super::SuperMinHash32V1;
     use super::SuperMinHash32V2;
 
-    use std::f64;
-    use std::cmp::min;
-    use crate::minhash::{compute_jaccard_similarity};
+    use crate::minhash::compute_jaccard_similarity;
     use crate::minhash::compute_minhash_similarity;
     use crate::text::tokenize_text;
+    use std::cmp::min;
+    use std::f64;
 
     static S1: &'static str = "local sensitive hashing is cool";
     static S2: &'static str = "local sensitive hashing is great";
     static S3: &'static str = "local sensitive hashing is awesome";
 
-
     static S10: &'static str = "If you're still searching, we can visit a few open houses together in the next few weeks. It might help give clarity on what you're looking for. What do you think? - Gail's assistant w/eXp Realty";
     static S11: &'static str = "If you're still searching, we can visit a few open houses together in the next few weeks. It might help give clarity on what you're looking for. What do you think? - Elle's assistant w/Bright Birch Real Estate";
-
 
     #[test]
     fn test_min_hash_v1() {
@@ -333,12 +360,16 @@ mod tests {
     fn test_min_hash<M: MinHash32>(min_hash: &M) {
         let similarity = min_hash.compute_similarity(tokenize_text(S10), tokenize_text(S11)) as f32;
         let actual_similarity = compute_jaccard_similarity(tokenize_text(S10), tokenize_text(S11));
-        println!("actual {} estimated {} ", actual_similarity,  similarity);
+        println!("actual {} estimated {} ", actual_similarity, similarity);
         assert!(f32::abs(similarity - 0.75) < 0.15);
 
-        let estimated_similarity = min_hash.compute_similarity(tokenize_text(S1), tokenize_text(S3)) as f32;
-        let actual_similarity = compute_jaccard_similarity(tokenize_text(S1), tokenize_text(S3)) ;
-        println!("actual {} estimated {}", actual_similarity,  estimated_similarity);
+        let estimated_similarity =
+            min_hash.compute_similarity(tokenize_text(S1), tokenize_text(S3)) as f32;
+        let actual_similarity = compute_jaccard_similarity(tokenize_text(S1), tokenize_text(S3));
+        println!(
+            "actual {} estimated {}",
+            actual_similarity, estimated_similarity
+        );
         assert!(f32::abs(estimated_similarity - actual_similarity) < 0.15);
     }
 }

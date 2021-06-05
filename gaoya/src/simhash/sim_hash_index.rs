@@ -1,30 +1,29 @@
-use std::collections::{HashMap, HashSet};
-use std::hash::{Hash, BuildHasher};
-use std::fmt::Debug;
-use std::marker::PhantomData;
-use itertools::Itertools;
-use fxhash::{FxHashMap, FxBuildHasher};
-use rayon::prelude::*;
-use core::mem;
-use crate::simhash::sim_hash::{SimHash};
 use crate::simhash::permutation::Permutation;
-use std::ops::BitOrAssign;
+use crate::simhash::sim_hash::SimHash;
 use crate::simhash::SimHashBits;
-
+use core::mem;
+use fxhash::{FxBuildHasher, FxHashMap};
+use itertools::Itertools;
+use rayon::prelude::*;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
+use std::hash::{BuildHasher, Hash};
+use std::marker::PhantomData;
+use std::ops::BitOrAssign;
 
 pub struct SimHashTable<S, Id>
-    where
-        Id: Hash + Eq + Clone,
-        S: SimHashBits
+where
+    Id: Hash + Eq + Clone,
+    S: SimHashBits,
 {
     permutation: Permutation<S>,
-    table: FxHashMap<S, Vec<(S,Id)>>,
+    table: FxHashMap<S, Vec<(S, Id)>>,
 }
 
-impl<S, Id>  SimHashTable<S, Id>
-    where
-        Id: Hash + Eq + Clone,
-        S: SimHashBits
+impl<S, Id> SimHashTable<S, Id>
+where
+    Id: Hash + Eq + Clone,
+    S: SimHashBits,
 {
     fn new(permutation: Permutation<S>) -> Self {
         SimHashTable {
@@ -35,21 +34,32 @@ impl<S, Id>  SimHashTable<S, Id>
 
     fn insert(&mut self, id: Id, simhash: &S) {
         let key = *simhash & self.permutation.simple_mask;
-        self.table.entry(key).or_insert(Vec::new()).push((*simhash, id));
+        self.table
+            .entry(key)
+            .or_insert(Vec::new())
+            .push((*simhash, id));
     }
 
-    fn query<'a, B: BuildHasher>(&'a self, simhash: &S, match_ids: &mut HashSet<&'a Id, B>, max_distance: usize) {
+    fn query<'a, B: BuildHasher>(
+        &'a self,
+        simhash: &S,
+        match_ids: &mut HashSet<&'a Id, B>,
+        max_distance: usize,
+    ) {
         let key = *simhash & self.permutation.simple_mask;
         match self.table.get(&key) {
             Some(candidates) => {
-                let matches = candidates.iter().filter(|pair| {
-                    let signature = pair.0;
-                    simhash.hamming_distance(&signature) < max_distance
-                }).map(|pair| &pair.1);
+                let matches = candidates
+                    .iter()
+                    .filter(|pair| {
+                        let signature = pair.0;
+                        simhash.hamming_distance(&signature) < max_distance
+                    })
+                    .map(|pair| &pair.1);
 
                 match_ids.extend(matches);
-            },
-            None => ()
+            }
+            None => (),
         }
     }
 
@@ -57,17 +67,18 @@ impl<S, Id>  SimHashTable<S, Id>
         let sum = self.table.values().map(|v| v.len()).sum::<usize>();
         match self.table.len() {
             len if len > 0 => Some(sum / len),
-            _ => None
+            _ => None,
         }
     }
 }
-unsafe impl<S: SimHashBits, Id:  Hash + Eq + Clone> Send for SimHashTable<S, Id> {}
-unsafe impl<S: SimHashBits, Id:  Hash + Eq + Clone> Sync for SimHashTable<S, Id> {}
+unsafe impl<S: SimHashBits, Id: Hash + Eq + Clone> Send for SimHashTable<S, Id> {}
+unsafe impl<S: SimHashBits, Id: Hash + Eq + Clone> Sync for SimHashTable<S, Id> {}
 
 pub struct SimHashIndex<S, Id>
-    where
-        S: SimHashBits ,
-        Id: Hash + Eq + Clone {
+where
+    S: SimHashBits,
+    Id: Hash + Eq + Clone,
+{
     num_blocks: usize,
     hamming_distance: usize,
     hash_tables: Vec<SimHashTable<S, Id>>,
@@ -77,11 +88,10 @@ pub struct SimHashIndex<S, Id>
 }
 
 impl<S, Id> SimHashIndex<S, Id>
-    where
-        S: SimHashBits  ,
-        Id: Hash + Eq + Clone
+where
+    S: SimHashBits,
+    Id: Hash + Eq + Clone,
 {
-
     pub fn new(num_blocks: usize, hamming_distance: usize) -> Self {
         let permutations = Permutation::<S>::create(num_blocks, hamming_distance);
         let max_width: usize = permutations.iter().map(|p| p.width).max().unwrap();
@@ -90,12 +100,13 @@ impl<S, Id> SimHashIndex<S, Id>
         SimHashIndex {
             num_blocks: num_blocks,
             hamming_distance: hamming_distance,
-            hash_tables: (
-                permutations.into_iter()
-                    .map(|permutation| SimHashTable::new(permutation)).collect()),
+            hash_tables: (permutations
+                .into_iter()
+                .map(|permutation| SimHashTable::new(permutation))
+                .collect()),
             id_signatures: FxHashMap::default(),
             marker: PhantomData,
-            size: 0
+            size: 0,
         }
     }
 
@@ -106,18 +117,16 @@ impl<S, Id> SimHashIndex<S, Id>
         self.id_signatures.insert(id, signature);
     }
 
-
     pub fn park_bulk_insert(&mut self, ids: Vec<Id>, signatures: Vec<S>)
-        where
-            S: Send + Sync,
-            Id: Send + Sync
+    where
+        S: Send + Sync,
+        Id: Send + Sync,
     {
-        self.hash_tables.par_iter_mut()
-            .for_each(|table| {
-                for item in ids.iter().zip(signatures.iter()) {
-                    table.insert(item.0.clone(), item.1);
-                }
-            });
+        self.hash_tables.par_iter_mut().for_each(|table| {
+            for item in ids.iter().zip(signatures.iter()) {
+                table.insert(item.0.clone(), item.1);
+            }
+        });
 
         for id_hash in ids.into_iter().zip(signatures.into_iter()) {
             self.id_signatures.insert(id_hash.0, id_hash.1);
@@ -126,19 +135,18 @@ impl<S, Id> SimHashIndex<S, Id>
     }
 
     pub fn par_bulk_insert_pairs(&mut self, id_signature_pairs: Vec<(Id, S)>)
-        where
-            S: Send + Sync,
-            Id: Send + Sync
+    where
+        S: Send + Sync,
+        Id: Send + Sync,
     {
-        self.hash_tables.par_iter_mut()
-            .for_each(|table| {
-                for item in id_signature_pairs.iter() {
-                    let i: &(Id, S) = item;
-                    let (a, b) = i;
-                    let k: Id = a.clone();
-                    table.insert(k, &b);
-                }
-            });
+        self.hash_tables.par_iter_mut().for_each(|table| {
+            for item in id_signature_pairs.iter() {
+                let i: &(Id, S) = item;
+                let (a, b) = i;
+                let k: Id = a.clone();
+                table.insert(k, &b);
+            }
+        });
 
         // for id_hash in id_signature_pairs {
         //     self.id_signatures.insert(id_hash.0, id_hash.1);
@@ -159,7 +167,9 @@ impl<S, Id> SimHashIndex<S, Id>
     }
 
     fn avg_bucket_count(&self) -> usize {
-        let counts: Vec<usize> = self.hash_tables.iter()
+        let counts: Vec<usize> = self
+            .hash_tables
+            .iter()
             .map(|table| table.avg_bucket_count())
             .filter(|val| val.is_some())
             .map(|val| val.unwrap())
@@ -168,25 +178,24 @@ impl<S, Id> SimHashIndex<S, Id>
             len if len > 0 => {
                 let sum = counts.iter().sum::<usize>();
                 sum / len
-            },
-            _ => 0
+            }
+            _ => 0,
         }
     }
-
 }
 
 #[cfg(test)]
 mod tests {
     use super::SimHashIndex;
-    use rand::{thread_rng, Rng};
     use crate::simhash::sim_hash::SimHash;
     use crate::simhash::sim_hasher::SimSipHasher64;
     use rand::distributions::{Distribution, Uniform};
+    use rand::{thread_rng, Rng};
 
     #[test]
     pub fn test_simhash_index() {
         let mut sim_hash_index = SimHashIndex::<u64, usize>::new(8, 6);
-        let doc = vec![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+        let doc = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
         let rand_range = Uniform::from(1..1000);
         let mut rng = thread_rng();
@@ -205,6 +214,5 @@ mod tests {
 
         let result = sim_hash_index.query(&sim_hash.create_signature(doc.iter()));
         println!("{:?}", result);
-
     }
 }

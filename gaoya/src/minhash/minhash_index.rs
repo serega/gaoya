@@ -1,12 +1,12 @@
-use std::collections::{HashMap, HashSet, BinaryHeap};
+use crate::minhash::compute_minhash_distance;
+use fxhash::FxBuildHasher;
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;
-use fxhash::FxBuildHasher;
-use std::{slice, fmt};
-use std::hash::{Hasher, Hash, BuildHasher};
 use rayon::prelude::*;
 use std::any::type_name;
-use crate::minhash::compute_minhash_distance;
+use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::hash::{BuildHasher, Hash, Hasher};
+use std::{fmt, slice};
 
 /*
 MinHashIndex stores all minhashes as Vec<T> in a hashmap, and uses unsafe pointer arithmetic
@@ -17,10 +17,9 @@ gives free access to whole minhashes, and bands without sacrificing neither perf
 memory utilization.
  */
 
-struct BandKey<T: Hash + Eq>
-{
+struct BandKey<T: Hash + Eq> {
     v: *const T,
-    len: usize
+    len: usize,
 }
 
 unsafe impl<T: Hash + Eq> Send for BandKey<T> {}
@@ -43,7 +42,9 @@ impl<T: Hash + Eq> PartialEq for BandKey<T> {
 
 impl<T: Hash + Eq> Hash for BandKey<T> {
     fn hash<H: Hasher>(&self, state: &mut H)
-        where T: Hash {
+    where
+        T: Hash,
+    {
         unsafe {
             for i in 0..self.len {
                 (*self.v.add(i)).hash(state)
@@ -55,7 +56,7 @@ impl<T: Hash + Eq> Hash for BandKey<T> {
 struct MinHashBand<T, Id>
 where
     T: Hash + Eq,
-    Id: Hash + Eq + Clone
+    Id: Hash + Eq + Clone,
 {
     hash_table: FxHashMap<BandKey<T>, FxHashSet<Id>>,
     band_start: isize,
@@ -66,9 +67,8 @@ where
 impl<T, Id> MinHashBand<T, Id>
 where
     T: Hash + Eq,
-    Id: Hash + Eq + Clone
+    Id: Hash + Eq + Clone,
 {
-
     pub fn new(band_start: isize, band_end: isize) -> Self {
         let mut hash_table = FxHashMap::default();
         hash_table.reserve(1000);
@@ -76,46 +76,61 @@ where
             hash_table: hash_table,
             band_start: band_start,
             band_end: band_end,
-            len: (band_end - band_start) as usize
+            len: (band_end - band_start) as usize,
         }
     }
 
     fn insert(&mut self, id: Id, signature: &Vec<T>) {
         let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
-        let band_key = BandKey { v: band_data, len: self.len };
-        self.hash_table.entry(band_key).or_insert(FxHashSet::default()).insert(id.clone());
+        let band_key = BandKey {
+            v: band_data,
+            len: self.len,
+        };
+        self.hash_table
+            .entry(band_key)
+            .or_insert(FxHashSet::default())
+            .insert(id.clone());
         ()
     }
 
     fn query<'a, S: BuildHasher>(&'a self, signature: &Vec<T>, match_ids: &mut HashSet<&'a Id, S>) {
         let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
-        let band_key = BandKey { v: band_data, len: self.len };
+        let band_key = BandKey {
+            v: band_data,
+            len: self.len,
+        };
         match self.hash_table.get(&band_key) {
-            Some(ids) => {
-                match_ids.extend(ids.iter())
-            },
-            None => ()
+            Some(ids) => match_ids.extend(ids.iter()),
+            None => (),
         }
     }
-
 
     fn query_to_owned<S: BuildHasher>(&self, signature: &Vec<T>, match_ids: &mut HashSet<Id, S>) {
         let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
-        let band_key = BandKey { v: band_data, len: self.len };
+        let band_key = BandKey {
+            v: band_data,
+            len: self.len,
+        };
         match self.hash_table.get(&band_key) {
             Some(ids) => {
                 match_ids.extend(ids.iter().cloned());
-            },
-            None => ()
+            }
+            None => (),
         }
     }
 
-
-    fn best_minhash_index<'a>(&'a self, signatures: &Vec<&[T]>, all_ids: &mut HashSet<&'a Id>) -> isize {
+    fn best_minhash_index<'a>(
+        &'a self,
+        signatures: &Vec<&[T]>,
+        all_ids: &mut HashSet<&'a Id>,
+    ) -> isize {
         let mut max_count: usize = 0;
         let mut best_index: isize = -1;
         for minhash in signatures.iter().enumerate() {
-            let band_key = BandKey { v: minhash.1.as_ptr(), len: self.len };
+            let band_key = BandKey {
+                v: minhash.1.as_ptr(),
+                len: self.len,
+            };
             match self.hash_table.get(&band_key) {
                 Some(ids) => {
                     let new_count = ids.iter().map(|id| !all_ids.contains(&id) as usize).count();
@@ -124,24 +139,30 @@ where
                         best_index = minhash.0 as isize;
                     }
                 }
-                None => ()
+                None => (),
             }
         }
-        let band_key = BandKey { v: signatures[best_index as usize].as_ptr(), len: self.len };
+        let band_key = BandKey {
+            v: signatures[best_index as usize].as_ptr(),
+            len: self.len,
+        };
         match self.hash_table.get(&band_key) {
             Some(ids) => {
                 for id in ids {
                     all_ids.insert(id);
                 }
             }
-            None => ()
+            None => (),
         }
         best_index
     }
 
     fn remove(&mut self, id: &Id, signature: &Vec<T>) -> bool {
         let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
-        let band_key = BandKey { v: band_data, len: (self.band_end - self.band_start) as usize };
+        let band_key = BandKey {
+            v: band_data,
+            len: (self.band_end - self.band_start) as usize,
+        };
 
         match self.hash_table.get_mut(&band_key) {
             Some(ids) => {
@@ -152,16 +173,19 @@ where
                 }
                 false
             }
-            None => false
+            None => false,
         }
     }
 
     fn has_ids(&self, signature: &Vec<T>) -> bool {
         let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
-        let band_key = BandKey { v: band_data, len: (self.band_end - self.band_start) as usize };
+        let band_key = BandKey {
+            v: band_data,
+            len: (self.band_end - self.band_start) as usize,
+        };
         match self.hash_table.get(&band_key) {
             Some(ids) => ids.len() > 0,
-            None => false
+            None => false,
         }
     }
 
@@ -171,13 +195,12 @@ where
         }
         self.hash_table.shrink_to_fit();
     }
-
 }
 
 pub struct MinHashIndex<T, Id>
 where
     T: Hash + Eq,
-    Id: Hash + Eq + Clone
+    Id: Hash + Eq + Clone,
 {
     bands: Vec<MinHashBand<T, Id>>,
     removed_ids: HashSet<Id>,
@@ -185,7 +208,7 @@ where
     threshold: f64,
     r: usize,
     b: usize,
-    size: usize
+    size: usize,
 }
 
 static REMOVED_KEYS_COUNT_CLEAN_TRIGGER: usize = 1000;
@@ -193,7 +216,7 @@ static REMOVED_KEYS_COUNT_CLEAN_TRIGGER: usize = 1000;
 impl<T, Id> fmt::Display for MinHashIndex<T, Id>
 where
     T: Hash + Eq,
-    Id: Hash + Eq + Clone
+    Id: Hash + Eq + Clone,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "MinHashIndex<{}> {{ threshold = {}, num_perms = {}, bands = {}, rows_per_band = {}, size = {} }}",
@@ -205,9 +228,8 @@ where
 impl<T, Id> MinHashIndex<T, Id>
 where
     T: Hash + Eq,
-    Id: Hash + Eq + Clone
+    Id: Hash + Eq + Clone,
 {
-
     pub fn new_with_weights(threshold: f64, num_perm: usize, fpw: f64, fnw: f64) -> Self {
         let (b, r) = optimal_param(threshold, num_perm, fpw, fnw);
 
@@ -225,7 +247,7 @@ where
             id_signatures: hash_table,
             b: b,
             r: r,
-            size: 0
+            size: 0,
         }
     }
 
@@ -249,10 +271,9 @@ where
             id_signatures: hash_table,
             b: b,
             r: r,
-            size: 0
+            size: 0,
         }
     }
-
 
     pub fn insert(&mut self, id: Id, signature: Vec<T>) {
         for band in &mut self.bands {
@@ -260,25 +281,22 @@ where
         }
         self.id_signatures.insert(id, signature);
         self.size += 1;
-
     }
 
     pub fn par_bulk_insert(&mut self, ids: Vec<Id>, signatures: Vec<Vec<T>>)
-        where
-            Id: Hash + Eq + Clone + Send + Sync,
-            T: Send + Sync
+    where
+        Id: Hash + Eq + Clone + Send + Sync,
+        T: Send + Sync,
     {
         unsafe {
-            self.bands.par_iter_mut()
-                .for_each(|band| {
-                    for item in signatures.iter().zip(ids.iter()) {
-                        let hashes = item.0;
-                        let id = item.1.clone();
-                        band.insert(id, hashes);
-                    }
-                    band.shrink_to_fit();
-                });
-
+            self.bands.par_iter_mut().for_each(|band| {
+                for item in signatures.iter().zip(ids.iter()) {
+                    let hashes = item.0;
+                    let id = item.1.clone();
+                    band.insert(id, hashes);
+                }
+                band.shrink_to_fit();
+            });
         }
         for id_hash in ids.into_iter().zip(signatures.into_iter()) {
             self.id_signatures.insert(id_hash.0, id_hash.1);
@@ -287,22 +305,20 @@ where
         self.id_signatures.shrink_to_fit();
     }
 
-
     pub fn par_bulk_insert_pairs(&mut self, id_signature_pairs: Vec<(Id, Vec<T>)>)
-        where
-            Id: Hash + Eq + Clone + Send + Sync,
-            T: Send + Sync
+    where
+        Id: Hash + Eq + Clone + Send + Sync,
+        T: Send + Sync,
     {
         unsafe {
-            self.bands.par_iter_mut()
-                .for_each(|band| {
-                    for item in id_signature_pairs.iter() {
-                        let i: &(Id, Vec<T>) = item;
-                        let (a, b) = i;
-                        let k: Id = a.clone();
-                        band.insert(k, &b);
-                    }
-                });
+            self.bands.par_iter_mut().for_each(|band| {
+                for item in id_signature_pairs.iter() {
+                    let i: &(Id, Vec<T>) = item;
+                    let (a, b) = i;
+                    let k: Id = a.clone();
+                    band.insert(k, &b);
+                }
+            });
         }
         for id_hash in id_signature_pairs {
             self.id_signatures.insert(id_hash.0, id_hash.1);
@@ -312,8 +328,9 @@ where
     }
 
     pub fn query(&self, query_signature: &Vec<T>) -> HashSet<&Id, FxBuildHasher>
-        where
-            Id: Hash + Eq + Clone {
+    where
+        Id: Hash + Eq + Clone,
+    {
         let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
         for band in &self.bands {
             band.query(query_signature, &mut match_ids);
@@ -332,8 +349,9 @@ where
     }
 
     pub fn query_owned(&self, query_signature: &Vec<T>) -> HashSet<Id, FxBuildHasher>
-        where
-            Id: Hash + Eq + Clone {
+    where
+        Id: Hash + Eq + Clone,
+    {
         let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
         for band in &self.bands {
             band.query_to_owned(query_signature, &mut match_ids);
@@ -356,22 +374,28 @@ where
         if self.removed_ids.len() > 0 {
             match_ids.retain(|item| !self.removed_ids.contains(item));
         }
-        let mut ids_distances: Vec<(Id, f64)> = match_ids.into_iter().map(|id| {
-            let signature = &self.id_signatures[&id];
-            let distance = compute_minhash_distance(query_signature, signature);
-            (id, distance)
-        }).collect();
-         ids_distances.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-         ids_distances[0..std::cmp::min(ids_distances.len(), k)].to_vec()
+        let mut ids_distances: Vec<(Id, f64)> = match_ids
+            .into_iter()
+            .map(|id| {
+                let signature = &self.id_signatures[&id];
+                let distance = compute_minhash_distance(query_signature, signature);
+                (id, distance)
+            })
+            .collect();
+        ids_distances.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        ids_distances[0..std::cmp::min(ids_distances.len(), k)].to_vec()
     }
 
     /// Removes a id from the index.
     pub fn remove(&mut self, id: &Id) {
         match self.id_signatures.get(id) {
             Some(hashes) => {
-                let fully_removed =  self.bands.iter_mut()
+                let fully_removed = self
+                    .bands
+                    .iter_mut()
                     .map(|band| band.remove(id, hashes) as usize)
-                    .sum::<usize>() == self.b;
+                    .sum::<usize>()
+                    == self.b;
                 if fully_removed {
                     self.id_signatures.remove(id);
                     ()
@@ -380,27 +404,34 @@ where
                     ()
                 }
                 self.size -= 1;
-            },
-            None => ()
+            }
+            None => (),
         }
         if self.removed_ids.len() > REMOVED_KEYS_COUNT_CLEAN_TRIGGER {
             self.clean_removed();
         }
     }
 
-
     fn clean_removed(&mut self) {
-        let fully_removed_ids: Vec<Id> = self.removed_ids.iter().filter(|id| {
-            let signature = self.id_signatures.get(id).unwrap();
-            self.bands.iter().filter(|band| band.has_ids(signature)).count() == 0
-        }).map(|id| id.clone()).collect();
+        let fully_removed_ids: Vec<Id> = self
+            .removed_ids
+            .iter()
+            .filter(|id| {
+                let signature = self.id_signatures.get(id).unwrap();
+                self.bands
+                    .iter()
+                    .filter(|band| band.has_ids(signature))
+                    .count()
+                    == 0
+            })
+            .map(|id| id.clone())
+            .collect();
 
         for id in fully_removed_ids {
             self.removed_ids.remove(&id);
             self.id_signatures.remove(&id);
         }
     }
-
 
     pub fn size(&self) -> usize {
         self.size
@@ -410,11 +441,13 @@ where
         self.b * self.r
     }
 
-
     /// This method filters candidates by measuring similarity between query_minhash and
     /// each candidate using full minhash similarity measure.
-    fn filter_by_minhash_similarity<'a>(&self, query_signature: &Vec<T>, candidates: HashSet<&'a Id>)
-                                        -> HashSet<&'a Id> {
+    fn filter_by_minhash_similarity<'a>(
+        &self,
+        query_signature: &Vec<T>,
+        candidates: HashSet<&'a Id>,
+    ) -> HashSet<&'a Id> {
         let mut result = HashSet::new();
         for candidate in candidates {
             let candidate_signature = &self.id_signatures[candidate];
@@ -426,15 +459,25 @@ where
         result
     }
 
-    pub fn calculate_centroid<S: BuildHasher>(&self, ids: &HashSet<&Id, S>, starting_centroid: &Vec<T>) -> Vec<T>
-        where T: Clone {
+    pub fn calculate_centroid<S: BuildHasher>(
+        &self,
+        ids: &HashSet<&Id, S>,
+        starting_centroid: &Vec<T>,
+    ) -> Vec<T>
+    where
+        T: Clone,
+    {
         self.calculate_centroid_by_band_majority(ids)
     }
 
-
-    pub fn calculate_centroid_from_starting(&self, ids: &HashSet<&Id>, starting_centroid: &Vec<T>)
-                                            -> Vec<T>
-        where T: Clone {
+    pub fn calculate_centroid_from_starting(
+        &self,
+        ids: &HashSet<&Id>,
+        starting_centroid: &Vec<T>,
+    ) -> Vec<T>
+    where
+        T: Clone,
+    {
         let mut bands: Vec<HashSet<&[T]>> = Vec::new();
         for i in 0..self.b {
             bands.push(HashSet::new());
@@ -465,8 +508,9 @@ where
     }
 
     pub fn calculate_centroid_(&self, ids: &HashSet<&Id>) -> Vec<T>
-        where T: Clone {
-
+    where
+        T: Clone,
+    {
         let mut bands: Vec<HashSet<&[T]>> = Vec::new();
         for i in 0..self.b {
             bands.push(HashSet::new());
@@ -490,8 +534,13 @@ where
         centroid
     }
 
-    pub fn calculate_centroid_by_band_majority<S: BuildHasher>(&self, ids: &HashSet<&Id, S>) -> Vec<T>
-        where T: Clone {
+    pub fn calculate_centroid_by_band_majority<S: BuildHasher>(
+        &self,
+        ids: &HashSet<&Id, S>,
+    ) -> Vec<T>
+    where
+        T: Clone,
+    {
         let mut band_counters: Vec<HashMap<&[T], usize>> = Vec::new();
         for i in 0..self.b {
             band_counters.push(HashMap::new());
@@ -516,9 +565,10 @@ where
     }
 
     pub fn calculate_centroid_by_hash_majority(&self, ids: &HashSet<&Id>) -> Vec<T>
-        where
-            Id: Hash + Eq + Clone,
-            T: Clone + Copy {
+    where
+        Id: Hash + Eq + Clone,
+        T: Clone + Copy,
+    {
         let mut counters: Vec<HashMap<&T, usize>> = Vec::new();
 
         for i in 0..self.num_perms() {
@@ -541,29 +591,32 @@ where
         }
         centroid
     }
-
-
 }
 
 // Calculate optimal param
 // https://github.com/ekzhu/datasketch/blob/master/datasketch/lsh.py
 // TODO: Understand what this code is doing
-fn false_positive_proba(threshold: f64, b: usize, r: usize) -> f64
-{
+fn false_positive_proba(threshold: f64, b: usize, r: usize) -> f64 {
     let r = r as f64;
     let b = b as f64;
-    return integrate(Box::new(|s: f64| 1.0 - (1.0 - s.powf(r)).powf(b)), 0.0,  threshold);
+    return integrate(
+        Box::new(|s: f64| 1.0 - (1.0 - s.powf(r)).powf(b)),
+        0.0,
+        threshold,
+    );
 }
 
-fn false_negative_proba(threshold: f64, b: usize, r: usize) -> f64
-{
+fn false_negative_proba(threshold: f64, b: usize, r: usize) -> f64 {
     let r = r as f64;
     let b = b as f64;
-    return integrate(Box::new(|s: f64| 1.0 - (1.0 - (1.0 - s.powf(r)).powf(b))), threshold, 1.0);
+    return integrate(
+        Box::new(|s: f64| 1.0 - (1.0 - (1.0 - s.powf(r)).powf(b))),
+        threshold,
+        1.0,
+    );
 }
 
-fn integrate(f: impl Fn(f64) -> f64, a: f64 , b: f64) -> f64
-{
+fn integrate(f: impl Fn(f64) -> f64, a: f64, b: f64) -> f64 {
     let p = 0.001;
     let mut area = 0.0;
     let mut x = a;
@@ -571,12 +624,15 @@ fn integrate(f: impl Fn(f64) -> f64, a: f64 , b: f64) -> f64
         area += f(x + 0.5 * p) * p;
         x += p;
     }
-    return area
+    return area;
 }
 
-fn optimal_param(threshold: f64, num_perm: usize,
-                 false_positive_weight: f64, false_negative_weight: f64) -> (usize, usize)
-{
+fn optimal_param(
+    threshold: f64,
+    num_perm: usize,
+    false_positive_weight: f64,
+    false_negative_weight: f64,
+) -> (usize, usize) {
     let mut min_error = 99999999999.0;
     let mut opt = (0, 0);
     for b in 1..num_perm + 1 {
@@ -594,16 +650,15 @@ fn optimal_param(threshold: f64, num_perm: usize,
     opt
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::optimal_param;
-    use rand::{thread_rng, Rng};
+    use crate::minhash::min_hash64::MinHash64V1;
+    use crate::minhash::{MinHash64, MinHashIndex};
     use rand::distributions::{Distribution, Uniform};
     use rand::prelude::ThreadRng;
+    use rand::{thread_rng, Rng};
     use std::borrow::Borrow;
-    use crate::minhash::{MinHash64, MinHashIndex};
-    use crate::minhash::min_hash64::MinHash64V1;
 
     static S1: &'static str = "local sensitive hashing is cool";
     static S2: &'static str = "local sensitive hashing is great";
@@ -611,7 +666,6 @@ mod tests {
     static S4: &'static str = "we all scream for ice cream";
     static S5: &'static str = "we all scream for ice cream sandwich";
     static S6: &'static str = "i like ice cream sandwich";
-
 
     #[test]
     pub fn test_lsh_index() {
@@ -623,7 +677,6 @@ mod tests {
         lsh_index.insert(4, min_hash.create_signature(S4.split_whitespace()));
         lsh_index.insert(5, min_hash.create_signature(S5.split_whitespace()));
         lsh_index.insert(6, min_hash.create_signature(S6.split_whitespace()));
-
 
         println!("{}", lsh_index);
         assert_eq!(lsh_index.size, 6);
@@ -646,46 +699,49 @@ mod tests {
     #[test]
     pub fn test_remove() {
         let mut lsh_index = MinHashIndex::new(0.3, 9);
-        lsh_index.insert(1, vec![1,1,1,2,2,2,3,3,3]);
-        lsh_index.insert(2, vec![1,1,1,2,2,2,3,3,3]);
-        lsh_index.insert(3, vec![1,1,1,2,2,2,4,4,4]);
-        lsh_index.insert(4, vec![1,1,1,3,3,3,4,4,4]);
-        lsh_index.insert(5, vec![2,2,2,3,3,3,4,4,4]);
-        lsh_index.insert(6, vec![3,3,3,4,4,4,5,5,5]);
-        lsh_index.insert(7, vec![3,3,3,4,4,4,5,5,5]);
+        lsh_index.insert(1, vec![1, 1, 1, 2, 2, 2, 3, 3, 3]);
+        lsh_index.insert(2, vec![1, 1, 1, 2, 2, 2, 3, 3, 3]);
+        lsh_index.insert(3, vec![1, 1, 1, 2, 2, 2, 4, 4, 4]);
+        lsh_index.insert(4, vec![1, 1, 1, 3, 3, 3, 4, 4, 4]);
+        lsh_index.insert(5, vec![2, 2, 2, 3, 3, 3, 4, 4, 4]);
+        lsh_index.insert(6, vec![3, 3, 3, 4, 4, 4, 5, 5, 5]);
+        lsh_index.insert(7, vec![3, 3, 3, 4, 4, 4, 5, 5, 5]);
 
-        let res = lsh_index.query(&vec![1,1,1,2,2,2,3,3,3]);
-        assert_eq!(res, vec![1,2,3,4].iter().collect());
+        let res = lsh_index.query(&vec![1, 1, 1, 2, 2, 2, 3, 3, 3]);
+        assert_eq!(res, vec![1, 2, 3, 4].iter().collect());
 
         lsh_index.remove(&1);
         assert_eq!(lsh_index.removed_ids.len(), 1);
-        let res = lsh_index.query(&vec![1,1,1,2,2,2,3,3,3]);
-        assert_eq!(res, vec![2,3,4].iter().collect());
+        let res = lsh_index.query(&vec![1, 1, 1, 2, 2, 2, 3, 3, 3]);
+        assert_eq!(res, vec![2, 3, 4].iter().collect());
 
         lsh_index.remove(&2);
         assert_eq!(lsh_index.removed_ids.len(), 2);
-        let res = lsh_index.query(&vec![1,1,1,2,2,2,3,3,3]);
-        assert_eq!(res, vec![3,4].iter().collect());
+        let res = lsh_index.query(&vec![1, 1, 1, 2, 2, 2, 3, 3, 3]);
+        assert_eq!(res, vec![3, 4].iter().collect());
 
         lsh_index.remove(&5);
         assert_eq!(lsh_index.removed_ids.len(), 3);
-        let res = lsh_index.query(&vec![3,3,3,4,4,4,5,5,5]);
-        assert_eq!(res, vec![6,7].iter().collect());
+        let res = lsh_index.query(&vec![3, 3, 3, 4, 4, 4, 5, 5, 5]);
+        assert_eq!(res, vec![6, 7].iter().collect());
 
         lsh_index.remove(&6);
         assert_eq!(lsh_index.removed_ids.len(), 4);
-        let res = lsh_index.query(&vec![3,3,3,4,4,4,5,5,5]);
+        let res = lsh_index.query(&vec![3, 3, 3, 4, 4, 4, 5, 5, 5]);
         assert_eq!(res, vec![7].iter().collect());
 
         lsh_index.remove(&7);
         assert_eq!(lsh_index.removed_ids.len(), 4);
-        assert_eq!(lsh_index.removed_ids, vec![1,2,5,6].into_iter().collect());
-        let res = lsh_index.query(&vec![3,3,3,4,4,4,5,5,5]);
+        assert_eq!(
+            lsh_index.removed_ids,
+            vec![1, 2, 5, 6].into_iter().collect()
+        );
+        let res = lsh_index.query(&vec![3, 3, 3, 4, 4, 4, 5, 5, 5]);
         assert_eq!(res.len(), 0);
 
         lsh_index.clean_removed();
         assert_eq!(lsh_index.removed_ids.len(), 3);
-        assert_eq!(lsh_index.removed_ids, vec![1,2,5].into_iter().collect());
+        assert_eq!(lsh_index.removed_ids, vec![1, 2, 5].into_iter().collect());
 
         lsh_index.remove(&3);
         lsh_index.remove(&4);
@@ -718,19 +774,28 @@ mod tests {
         assert!(ret.contains(&3));
     }
 
-    fn random_change_values(v: &Vec<u64>, num_changes: usize, num_vecs: usize, rng: &mut ThreadRng) -> Vec<Vec<u64>> {
+    fn random_change_values(
+        v: &Vec<u64>,
+        num_changes: usize,
+        num_vecs: usize,
+        rng: &mut ThreadRng,
+    ) -> Vec<Vec<u64>> {
         let rand_range = Uniform::from(1..100000);
         let index_rand_range = Uniform::from(0..1000);
-        (0..num_vecs).map(|_| {
-            let indices: Vec<usize> = (0..num_changes).map(|_| index_rand_range.sample(rng)).collect();
-            let changes: Vec<u64> = (0..num_changes).map(|_| rand_range.sample(rng)).collect();
-            let mut c = v.clone();
-            assert_eq!(c.len(), v.len());
-            for i in indices.iter().zip(changes.iter()) {
-                c[*i.0] = i.1.clone();
-            }
-            c
-        }).collect()
+        (0..num_vecs)
+            .map(|_| {
+                let indices: Vec<usize> = (0..num_changes)
+                    .map(|_| index_rand_range.sample(rng))
+                    .collect();
+                let changes: Vec<u64> = (0..num_changes).map(|_| rand_range.sample(rng)).collect();
+                let mut c = v.clone();
+                assert_eq!(c.len(), v.len());
+                for i in indices.iter().zip(changes.iter()) {
+                    c[*i.0] = i.1.clone();
+                }
+                c
+            })
+            .collect()
     }
 
     #[test]
@@ -753,7 +818,10 @@ mod tests {
         vecs.extend_from_slice(random_change_values(&v3, 10, 99, &mut rng).as_slice());
 
         let mut ids: Vec<u64> = (0..300).collect();
-        let signatures = vecs.iter().map(|v| min_hash.create_signature(v.iter())).collect();
+        let signatures = vecs
+            .iter()
+            .map(|v| min_hash.create_signature(v.iter()))
+            .collect();
 
         assert_eq!(vecs.len(), ids.len());
         lsh_index.par_bulk_insert(ids, signatures);
@@ -775,5 +843,4 @@ mod tests {
         assert_eq!(ret.len(), 100);
         assert_eq!((200..300).filter(|i| ret.contains(&i)).count(), 100);
     }
-
 }
