@@ -127,8 +127,7 @@ impl MinHash64 for MinHash64V1 {
 
         match hashes.len() {
             len if len > 0 => self
-                .a
-                .iter()
+                .a.iter()
                 .zip(self.b.iter())
                 .map(|ab| {
                     hashes

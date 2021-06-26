@@ -129,8 +129,8 @@ impl MinHash32V2 {
 
     pub fn new_with_hasher(num_hashes: usize, hashers: Hashers) -> Self {
         let mut rng = thread_rng();
-        let rand_range1 = Uniform::from(1..u32::max_value() as u64);
-        let rand_range2 = Uniform::from(0..u32::max_value() as u64);
+        let rand_range1 = Uniform::from(1..u32::MAX as u64);
+        let rand_range2 = Uniform::from(0..u32::MAX as u64);
         MinHash32V2 {
             hashers: hashers,
             a: (0..num_hashes)
