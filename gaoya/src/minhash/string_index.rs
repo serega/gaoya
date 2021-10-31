@@ -1,7 +1,7 @@
 use crate::minhash::hashers::Hashers;
 use crate::minhash::min_hash64::MinHash64V1;
 use crate::minhash::{MinHash64, MinHashIndex};
-use crate::text::tokenize_text;
+use crate::text::whitespace_split;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::fmt;
@@ -9,6 +9,8 @@ use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error};
 use std::io::{Read, Write};
+
+
 pub struct MinHashStringIndex {
     lsh_index: MinHashIndex<u64, u64>,
     min_hash: MinHash64V1,
@@ -54,14 +56,14 @@ impl MinHashStringIndex {
     }
 
     pub fn insert(&mut self, text: String) {
-        let min_hashes = self.min_hash.create_signature(tokenize_text(text.as_str()));
+        let min_hashes = self.min_hash.create_signature(whitespace_split(text.as_str()));
         self.doc_id += 1;
         self.doc_map.insert(self.doc_id, text);
         self.lsh_index.insert(self.doc_id, min_hashes);
     }
 
     pub fn query(&self, text: &str) -> Vec<&String> {
-        let min_hashes = self.min_hash.create_signature(tokenize_text(text));
+        let min_hashes = self.min_hash.create_signature(whitespace_split(text));
         let ids = self.lsh_index.query(&min_hashes);
         ids.iter().map(|id| self.doc_map.get(id).unwrap()).collect()
     }
@@ -103,7 +105,7 @@ impl MinHashStringIndex {
                     .map(|line| {
                         (
                             line.0,
-                            self.min_hash.create_signature(tokenize_text(&line.1)),
+                            self.min_hash.create_signature(whitespace_split(&line.1)),
                         )
                     })
                     .collect();

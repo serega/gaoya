@@ -322,7 +322,7 @@ mod tests {
 
     use crate::minhash::compute_jaccard_similarity;
     use crate::minhash::compute_minhash_similarity;
-    use crate::text::tokenize_text;
+    use crate::text::whitespace_split;
     use std::cmp::min;
     use std::f64;
 
@@ -358,14 +358,14 @@ mod tests {
     }
 
     fn test_min_hash<M: MinHash32>(min_hash: &M) {
-        let similarity = min_hash.compute_similarity(tokenize_text(S10), tokenize_text(S11)) as f32;
-        let actual_similarity = compute_jaccard_similarity(tokenize_text(S10), tokenize_text(S11));
+        let similarity = min_hash.compute_similarity(whitespace_split(S10), whitespace_split(S11)) as f32;
+        let actual_similarity = compute_jaccard_similarity(whitespace_split(S10), whitespace_split(S11));
         println!("actual {} estimated {} ", actual_similarity, similarity);
         assert!(f32::abs(similarity - 0.75) < 0.15);
 
         let estimated_similarity =
-            min_hash.compute_similarity(tokenize_text(S1), tokenize_text(S3)) as f32;
-        let actual_similarity = compute_jaccard_similarity(tokenize_text(S1), tokenize_text(S3));
+            min_hash.compute_similarity(whitespace_split(S1), whitespace_split(S3)) as f32;
+        let actual_similarity = compute_jaccard_similarity(whitespace_split(S1), whitespace_split(S3));
         println!(
             "actual {} estimated {}",
             actual_similarity, estimated_similarity

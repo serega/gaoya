@@ -11,7 +11,7 @@ pub use self::sim_hasher::SimSipHasher64;
 
 use core::{fmt, mem};
 
-use num::{One, Zero};
+use num_traits::{One, Zero};
 use std::cmp::Ordering;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;

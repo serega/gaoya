@@ -3,7 +3,7 @@ use pyo3::PyObjectProtocol;
 extern crate gaoya;
 use self::gaoya::simhash::SimSipHasher128;
 use gaoya::simhash::{SimHash, SimHashIndex, SimSipHasher64};
-use gaoya::text::tokenize_text;
+use gaoya::text::whitespace_split;
 use rayon::prelude::*;
 
 #[pyclass]
@@ -27,7 +27,7 @@ impl SimHash64StringIntIndex {
     pub fn insert_document(&mut self, id: u64, doc: String) {
         self.inner.insert(
             id,
-            self.sim_hash.create_signature(tokenize_text(doc.as_str())),
+            self.sim_hash.create_signature(whitespace_split(doc.as_str())),
         )
     }
 
@@ -47,13 +47,13 @@ impl SimHash64StringIntIndex {
     pub fn par_bulk_insert_docs(&mut self, ids: Vec<u64>, docs: Vec<&str>) {
         let signatures = docs
             .par_iter()
-            .map(|doc| self.sim_hash.create_signature(tokenize_text(doc)))
+            .map(|doc| self.sim_hash.create_signature(whitespace_split(doc)))
             .collect();
         self.inner.park_bulk_insert(ids, signatures);
     }
 
     pub fn query(&self, doc: String) -> Vec<u64> {
-        let signature = self.sim_hash.create_signature(tokenize_text(doc.as_str()));
+        let signature = self.sim_hash.create_signature(whitespace_split(doc.as_str()));
         self.inner
             .query(&signature)
             .into_iter()
@@ -96,7 +96,7 @@ impl SimHash128StringIntIndex {
     pub fn insert_document(&mut self, id: u64, doc: String) {
         self.inner.insert(
             id,
-            self.sim_hash.create_signature(tokenize_text(doc.as_str())),
+            self.sim_hash.create_signature(whitespace_split(doc.as_str())),
         )
     }
 
@@ -116,13 +116,13 @@ impl SimHash128StringIntIndex {
     pub fn par_bulk_insert_docs(&mut self, ids: Vec<u64>, docs: Vec<&str>) {
         let signatures = docs
             .par_iter()
-            .map(|doc| self.sim_hash.create_signature(tokenize_text(doc)))
+            .map(|doc| self.sim_hash.create_signature(whitespace_split(doc)))
             .collect();
         self.inner.park_bulk_insert(ids, signatures);
     }
 
     pub fn query(&self, doc: String) -> Vec<u64> {
-        let signature = self.sim_hash.create_signature(tokenize_text(doc.as_str()));
+        let signature = self.sim_hash.create_signature(whitespace_split(doc.as_str()));
         self.inner
             .query(&signature)
             .into_iter()

@@ -232,7 +232,7 @@ where
 {
     pub fn new_with_weights(threshold: f64, num_perm: usize, fpw: f64, fnw: f64) -> Self {
         let (b, r) = optimal_param(threshold, num_perm, fpw, fnw);
-
+        println!("{} {}", b, r);
         let mut bands = Vec::new();
         for i in 0..b {
             let (start, end) = (i * r, (i + 1) * r);
@@ -698,11 +698,12 @@ mod tests {
 
     #[test]
     pub fn test_remove() {
-        let mut lsh_index = MinHashIndex::new(0.3, 9);
+        let mut lsh_index = MinHashIndex::new(0.4, 9);
         lsh_index.insert(1, vec![1, 1, 1, 2, 2, 2, 3, 3, 3]);
         lsh_index.insert(2, vec![1, 1, 1, 2, 2, 2, 3, 3, 3]);
-        lsh_index.insert(3, vec![1, 1, 1, 2, 2, 2, 4, 4, 4]);
-        lsh_index.insert(4, vec![1, 1, 1, 3, 3, 3, 4, 4, 4]);
+        lsh_index.insert(3, vec![1, 1, 1, 2, 2, 2, 3, 4, 4]);
+        lsh_index.insert(4, vec![1, 1, 1, 2, 2, 2, 3, 4, 3]);
+
         lsh_index.insert(5, vec![2, 2, 2, 3, 3, 3, 4, 4, 4]);
         lsh_index.insert(6, vec![3, 3, 3, 4, 4, 4, 5, 5, 5]);
         lsh_index.insert(7, vec![3, 3, 3, 4, 4, 4, 5, 5, 5]);
@@ -721,27 +722,27 @@ mod tests {
         assert_eq!(res, vec![3, 4].iter().collect());
 
         lsh_index.remove(&5);
-        assert_eq!(lsh_index.removed_ids.len(), 3);
+        assert_eq!(lsh_index.removed_ids.len(), 2);
         let res = lsh_index.query(&vec![3, 3, 3, 4, 4, 4, 5, 5, 5]);
         assert_eq!(res, vec![6, 7].iter().collect());
 
         lsh_index.remove(&6);
-        assert_eq!(lsh_index.removed_ids.len(), 4);
+        assert_eq!(lsh_index.removed_ids.len(), 3);
         let res = lsh_index.query(&vec![3, 3, 3, 4, 4, 4, 5, 5, 5]);
         assert_eq!(res, vec![7].iter().collect());
 
         lsh_index.remove(&7);
-        assert_eq!(lsh_index.removed_ids.len(), 4);
+        assert_eq!(lsh_index.removed_ids.len(), 3);
         assert_eq!(
             lsh_index.removed_ids,
-            vec![1, 2, 5, 6].into_iter().collect()
+            vec![1, 2, 6].into_iter().collect()
         );
         let res = lsh_index.query(&vec![3, 3, 3, 4, 4, 4, 5, 5, 5]);
         assert_eq!(res.len(), 0);
 
         lsh_index.clean_removed();
-        assert_eq!(lsh_index.removed_ids.len(), 3);
-        assert_eq!(lsh_index.removed_ids, vec![1, 2, 5].into_iter().collect());
+        assert_eq!(lsh_index.removed_ids.len(), 2);
+        assert_eq!(lsh_index.removed_ids, vec![1, 2].into_iter().collect());
 
         lsh_index.remove(&3);
         lsh_index.remove(&4);

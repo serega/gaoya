@@ -84,7 +84,7 @@ mod tests {
     use crate::simhash::sim_hasher::SimSipHasher128;
     use crate::simhash::sim_hasher::{ShaHasher64, SimSipHasher64};
     use crate::simhash::SimHashBits;
-    use crate::text::tokenize_text;
+    use crate::text::whitespace_split;
 
     static S1: &'static str = "Returns the number of bits necessary to represent an integer in binary, excluding the sign and leading zero";
     static S2: &'static str = "Returns the number of bits necessary to represent an integer in binary, excluding the sign and leading zero bit";
@@ -96,8 +96,8 @@ mod tests {
     #[test]
     pub fn test_sim_hash_basics() {
         let sim_hash = SimHash::<ShaHasher64, u64, 64>::new(ShaHasher64::new());
-        let s1 = sim_hash.create_signature(tokenize_text(S1));
-        let s2 = sim_hash.create_signature(tokenize_text(S2));
+        let s1 = sim_hash.create_signature(whitespace_split(S1));
+        let s2 = sim_hash.create_signature(whitespace_split(S2));
         println!("{:b}", s1);
         println!("{:b}", s2);
 
@@ -107,8 +107,8 @@ mod tests {
     #[test]
     pub fn test_sim_hash_basics128() {
         let sim_hash = SimHash::<SimSipHasher128, u128, 128>::new(SimSipHasher128::new(1, 2));
-        let s1 = sim_hash.create_signature(tokenize_text(S1));
-        let s2 = sim_hash.create_signature(tokenize_text(S2));
+        let s1 = sim_hash.create_signature(whitespace_split(S1));
+        let s2 = sim_hash.create_signature(whitespace_split(S2));
         println!("{:b}", s1);
         println!("{:b}", s1);
         println!("s1 {} s2  {} distance {}", s1, s2, s1.hamming_distance(&s2));

@@ -1,13 +1,15 @@
 use pyo3::prelude::*;
-use pyo3::PyObjectProtocol;
+use pyo3::{PyObjectProtocol, PyClass, PyTypeInfo};
 
 use gaoya::minhash::{
     compute_jaccard_similarity, Hashers, MinHash16, MinHash16V1, MinHash32, MinHash32V2, MinHash64,
     MinHash64V1,
 };
-use gaoya::text::tokenize_text;
+use gaoya::text::whitespace_split;
 use pyo3::exceptions::PyValueError;
 use rayon::prelude::*;
+use pyo3::class::impl_::PyClassImpl;
+use crate::{OnStackTokenizer, OnHeapTokenizer, TokenizerOption, make_tokenizer};
 
 extern crate gaoya;
 
@@ -51,7 +53,7 @@ impl Minhash64StringIntIndex {
     pub fn insert_document(&mut self, id: i64, doc: String) {
         self.inner.insert(
             id,
-            self.min_hash.create_signature(tokenize_text(doc.as_str())),
+            self.min_hash.create_signature(whitespace_split(doc.as_str())),
         );
     }
 
@@ -63,7 +65,7 @@ impl Minhash64StringIntIndex {
     pub fn par_bulk_insert_docs(&mut self, ids: Vec<i64>, docs: Vec<&str>) {
         let docs_tokens = docs
             .par_iter()
-            .map(|doc| tokenize_text(doc).collect())
+            .map(|doc| whitespace_split(doc).collect())
             .collect();
         self.par_bulk_insert_tokens(ids, docs_tokens);
     }
@@ -88,7 +90,7 @@ impl Minhash64StringIntIndex {
     }
 
     pub fn query(&self, text: String) -> Vec<i64> {
-        let signature = &self.min_hash.create_signature(tokenize_text(text.as_str()));
+        let signature = &self.min_hash.create_signature(whitespace_split(text.as_str()));
         self.inner.query_owned(signature).into_iter().collect()
     }
 
@@ -96,6 +98,7 @@ impl Minhash64StringIntIndex {
         self.inner.size()
     }
 }
+
 
 #[pyproto]
 impl PyObjectProtocol for Minhash64StringIntIndex {
@@ -148,7 +151,7 @@ impl MinHash32StringIntIndex {
     pub fn insert_document(&mut self, id: i64, doc: String) {
         self.inner.insert(
             id,
-            self.min_hash.create_signature(tokenize_text(doc.as_str())),
+            self.min_hash.create_signature(whitespace_split(doc.as_str())),
         );
     }
 
@@ -160,7 +163,7 @@ impl MinHash32StringIntIndex {
     pub fn par_bulk_insert_docs(&mut self, ids: Vec<i64>, docs: Vec<&str>) {
         let docs_tokens = docs
             .par_iter()
-            .map(|doc| tokenize_text(doc).collect())
+            .map(|doc| whitespace_split(doc).collect())
             .collect();
         self.par_bulk_insert_tokens(ids, docs_tokens);
     }
@@ -185,7 +188,7 @@ impl MinHash32StringIntIndex {
     }
 
     pub fn query(&self, text: String) -> Vec<i64> {
-        let signature = &self.min_hash.create_signature(tokenize_text(text.as_str()));
+        let signature = &self.min_hash.create_signature(whitespace_split(text.as_str()));
         self.inner.query_owned(signature).into_iter().collect()
     }
 
@@ -205,10 +208,11 @@ impl PyObjectProtocol for MinHash32StringIntIndex {
     }
 }
 
-#[pyclass]
+#[pyclass(unsendable)]
 struct MinHash16StringIntIndex {
     inner: gaoya::minhash::MinHashIndex<u16, i64>,
     min_hash: MinHash16V1,
+    tokenizer: TokenizerOption
 }
 
 #[pymethods]
@@ -219,7 +223,9 @@ impl MinHash16StringIntIndex {
         num_perm = "128",
         fpw = "0.5",
         fnw = "0.5",
-        hashfunc = "\"sip\""
+        hashfunc = "\"sip\"",
+        analyzer = "\"word\"",
+        ngram_range = "(1,1)",
     )]
     pub fn new(
         threshold: f64,
@@ -227,7 +233,10 @@ impl MinHash16StringIntIndex {
         fpw: f64,
         fnw: f64,
         hashfunc: &str,
+        analyzer: &str,
+        ngram_range: (usize, usize)
     ) -> PyResult<Self> {
+        let option_range = if ngram_range.0 == 1 && ngram_range.1 == 1 { Some(ngram_range) } else { None };
         match Hashers::from_str(hashfunc) {
             Err(e) => Err(PyValueError::new_err(e)),
             Ok(hasher) => {
@@ -236,6 +245,7 @@ impl MinHash16StringIntIndex {
                         threshold, num_perm, fpw, fnw,
                     ),
                     min_hash: MinHash16V1::new_with_hasher(num_perm, hasher),
+                    tokenizer: make_tokenizer(analyzer, option_range)
                 };
                 Ok(index)
             }
@@ -243,10 +253,22 @@ impl MinHash16StringIntIndex {
     }
 
     pub fn insert_document(&mut self, id: i64, doc: String) {
-        self.inner.insert(
-            id,
-            self.min_hash.create_signature(tokenize_text(doc.as_str())),
-        );
+        match &self.tokenizer {
+            TokenizerOption::OnStack(tokenizer) => {
+                self.inner.insert(
+                    id,
+                    self.min_hash.create_signature(tokenizer.tokenize(doc.as_str())),
+                );
+            },
+            TokenizerOption::OnHeap(tokenizer) => {
+                self.inner.insert(
+                    id,
+                    self.min_hash.create_signature(tokenizer.tokenize(doc.as_str())),
+                );
+            },
+            TokenizerOption::None => ()
+        }
+
     }
 
     pub fn insert_tokens(&mut self, id: i64, tokens: Vec<&str>) {
@@ -257,7 +279,7 @@ impl MinHash16StringIntIndex {
     pub fn par_bulk_insert_docs(&mut self, ids: Vec<i64>, docs: Vec<&str>) {
         let docs_tokens = docs
             .par_iter()
-            .map(|doc| tokenize_text(doc).collect())
+            .map(|doc| whitespace_split(doc).collect())
             .collect();
         self.par_bulk_insert_tokens(ids, docs_tokens);
     }
@@ -282,7 +304,7 @@ impl MinHash16StringIntIndex {
     }
 
     pub fn query(&self, text: String) -> Vec<i64> {
-        let signature = &self.min_hash.create_signature(tokenize_text(text.as_str()));
+        let signature = &self.min_hash.create_signature(whitespace_split(text.as_str()));
         self.inner.query_owned(signature).into_iter().collect()
     }
 
@@ -301,6 +323,8 @@ impl PyObjectProtocol for MinHash16StringIntIndex {
         Ok(format!("{}", self.inner))
     }
 }
+
+/*
 
 #[pyclass]
 struct MinHash32IntIntIndex {
@@ -412,6 +436,8 @@ impl MinHash32IntIntIndex {
     }
 }
 
+
+
 #[pyproto]
 impl PyObjectProtocol for MinHash32IntIntIndex {
     fn __str__(&self) -> PyResult<String> {
@@ -423,10 +449,12 @@ impl PyObjectProtocol for MinHash32IntIntIndex {
     }
 }
 
+ */
+
 pub fn init_minhash_module(m: &PyModule) -> PyResult<()> {
     m.add_class::<Minhash64StringIntIndex>()?;
     m.add_class::<MinHash32StringIntIndex>()?;
     m.add_class::<MinHash16StringIntIndex>()?;
-    m.add_class::<MinHash32IntIntIndex>()?;
+    //m.add_class::<MinHash32IntIntIndex>()?;
     Ok(())
 }

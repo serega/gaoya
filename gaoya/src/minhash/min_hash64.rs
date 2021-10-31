@@ -157,7 +157,7 @@ mod tests {
     use super::MinHash64V1;
 
     use crate::minhash::{centroid_minhash, compute_jaccard_similarity, MinHash64};
-    use crate::text::tokenize_text;
+    use crate::text::whitespace_split;
     use std::f64;
 
     static S1: &'static str = "local sensitive hashing is cool";
@@ -170,14 +170,14 @@ mod tests {
     #[test]
     fn test_min_hash_similarity() {
         let min_hash: MinHash64V1 = MinHash64V1::new(200);
-        let similarity = min_hash.compute_similarity(tokenize_text(S10), tokenize_text(S11)) as f32;
-        let actual_similarity = compute_jaccard_similarity(tokenize_text(S10), tokenize_text(S11));
+        let similarity = min_hash.compute_similarity(whitespace_split(S10), whitespace_split(S11)) as f32;
+        let actual_similarity = compute_jaccard_similarity(whitespace_split(S10), whitespace_split(S11));
         println!("actual {} estimated {} ", actual_similarity, similarity);
         assert!(f32::abs(similarity - 0.75) < 0.1);
 
         let estimated_similarity =
-            min_hash.compute_similarity(tokenize_text(S1), tokenize_text(S3)) as f32;
-        let actual_similarity = compute_jaccard_similarity(tokenize_text(S1), tokenize_text(S3));
+            min_hash.compute_similarity(whitespace_split(S1), whitespace_split(S3)) as f32;
+        let actual_similarity = compute_jaccard_similarity(whitespace_split(S1), whitespace_split(S3));
         println!(
             "actual {} estimated {}",
             actual_similarity, estimated_similarity
