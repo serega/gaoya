@@ -2,7 +2,7 @@
 name = "pygaoya"
 version = "0.1.0"
 authors = ["Sergejs Melderis <sergejs.melderis@sinch.com>"]
-edition = "2018"
+edition = "2021"
 
 
 
@@ -22,7 +22,7 @@ classifier = [
 ]
 
 [dependencies]
-libc = "0.2"
+libc = "0.2.106"
 pyo3 = { version = "0.14.5", features = ["extension-module"] }
 rayon = "1.5.1"
 shingles = "0.1.1"
@@ -32,7 +32,7 @@ version = "*"
 path = "../gaoya"
 
 [dev-dependencies]
-tempfile = "3.1"
+tempfile = "3.2.0"
 
 [target.x86_64-apple-darwin]
 rustflags = [
