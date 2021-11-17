@@ -26,8 +26,12 @@ seahash = "4.1.0"
 itertools = "0.10.1"
 #num = "0.4.0"
 num-traits = "0.2.14"
-ngram = "0.1.13"
+#ngram = "0.1.13"
 shingles = "0.1.1"
+crossbeam-utils = "0.8.5"
+triomphe = "0.1.3"
+
+
 
 
 

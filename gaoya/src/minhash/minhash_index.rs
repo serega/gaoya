@@ -1,4 +1,4 @@
-use crate::minhash::compute_minhash_distance;
+use crate::minhash::{compute_minhash_distance, compute_minhash_similarity};
 use fxhash::FxBuildHasher;
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;
@@ -7,6 +7,10 @@ use std::any::type_name;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::hash::{BuildHasher, Hash, Hasher};
 use std::{fmt, slice};
+use std::ops::Range;
+use itertools::Itertools;
+use sha1::digest::generic_array::typenum::Cmp;
+use crate::clustering::QueryIndex;
 
 /*
 MinHashIndex stores all minhashes as Vec<T> in a hashmap, and uses unsafe pointer arithmetic
@@ -255,25 +259,41 @@ where
         MinHashIndex::new_with_weights(threshold, num_hashes, 0.5, 0.5)
     }
 
-    pub fn new_with_params(b: usize, r: usize) -> Self {
+
+    pub fn new_with_params(num_bands: usize, band_width: usize, threshold: f64) -> Self {
         let mut bands = Vec::new();
-        for i in 0..b {
-            let (start, end) = (i * r, (i + 1) * r);
+        for i in 0..num_bands {
+            let (start, end) = (i * band_width, (i + 1) * band_width);
             bands.push(MinHashBand::<T, Id>::new(start as isize, end as isize));
         }
         let mut hash_table = FxHashMap::default();
         hash_table.reserve(1000);
-
         MinHashIndex {
             bands: bands,
             removed_ids: HashSet::new(),
-            threshold: 0.0, //TODO
+            threshold: threshold,
             id_signatures: hash_table,
-            b: b,
-            r: r,
+            b: num_bands,
+            r: band_width,
             size: 0,
         }
+
     }
+
+    pub fn get_keys(&self) -> Vec<Id> {
+        self.bands[0].hash_table.values()
+            .into_iter().flat_map(|s| s.iter())
+            .map(|id| id.clone())
+            .collect()
+    }
+
+    pub fn get_keys_refs(&self) -> Vec<&Id> {
+        self.bands[0].hash_table.values()
+            .into_iter().flat_map(|s| s.iter())
+            .collect()
+    }
+
+
 
     pub fn insert(&mut self, id: Id, signature: Vec<T>) {
         for band in &mut self.bands {
@@ -327,6 +347,29 @@ where
         self.id_signatures.shrink_to_fit();
     }
 
+    pub fn query_one(&self, query_signature: &Vec<T>) -> Option<&Id> {
+        let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
+        for band in &self.bands {
+            band.query(query_signature, &mut match_ids);
+        }
+
+        if self.removed_ids.len() > 0 {
+            match_ids.retain(|item| !self.removed_ids.contains(item));
+        }
+
+        let best_match = match_ids.into_iter()
+            .map(|id| {
+                let signature = &self.id_signatures[id];
+                (id, compute_minhash_similarity(signature, query_signature))
+            })
+            .filter(|pair| pair.1 > self.threshold)
+            .max_by(|x, y| x.1.partial_cmp(&y.1).unwrap());
+        match best_match {
+            Some(pair) => Some(pair.0),
+            None => None
+        }
+    }
+
     pub fn query(&self, query_signature: &Vec<T>) -> HashSet<&Id, FxBuildHasher>
     where
         Id: Hash + Eq + Clone,
@@ -342,11 +385,36 @@ where
 
         match_ids.retain(|id| {
             let signature = &self.id_signatures[id];
+            compute_minhash_similarity(signature, query_signature) > self.threshold
+        });
+
+        match_ids
+    }
+
+    /*
+    pub fn query_mut(&mut self, query_signature: &Vec<T>) -> HashSet<&mut Id, FxBuildHasher>
+        where
+            Id: Hash + Eq + Clone,
+    {
+        let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
+        for band in &self.bands {
+            band.query_mut(query_signature, &mut match_ids);
+        }
+
+        if self.removed_ids.len() > 0 {
+            match_ids.retain(|item| !self.removed_ids.contains(item));
+        }
+
+        match_ids.retain(|id| {
+            let signature = &self.id_signatures[id];
             compute_minhash_distance(signature, query_signature) < self.threshold
         });
 
         match_ids
     }
+
+     */
+
 
     pub fn query_owned(&self, query_signature: &Vec<T>) -> HashSet<Id, FxBuildHasher>
     where
@@ -485,7 +553,7 @@ where
         for id in ids {
             let mut signature = self.id_signatures.get(&id).unwrap();
             for i in 0..self.b {
-                let band: &[T] = &signature[i * self.r..(i + 1) * self.r];
+                let band: &[T] = &signature[self.band_range(i)];
                 bands[i].insert(band);
             }
         }
@@ -509,7 +577,7 @@ where
 
     pub fn calculate_centroid_(&self, ids: &HashSet<&Id>) -> Vec<T>
     where
-        T: Clone,
+        T: Clone
     {
         let mut bands: Vec<HashSet<&[T]>> = Vec::new();
         for i in 0..self.b {
@@ -518,8 +586,8 @@ where
         for id in ids {
             let mut signature = self.id_signatures.get(&id).unwrap();
             for i in 0..self.b {
-                let entry: &[T] = &signature[i * self.r..(i + 1) * self.r];
-                bands[i].insert(entry);
+                let band: &[T] = &signature[self.band_range(i)];
+                bands[i].insert(band);
             }
         }
         let mut all_ids = HashSet::new();
@@ -533,6 +601,42 @@ where
 
         centroid
     }
+
+    fn band_range(&self, band_index: usize) -> Range<usize> {
+        band_index * self.r..(band_index + 1) * self.r
+    }
+
+    pub fn calculate_centroid_by_band_majority_v(
+        &self,
+        ids: &Vec<Id>,
+    ) -> Vec<T>
+        where
+            T: Clone,
+    {
+        let mut band_counters: Vec<HashMap<&[T], usize>> = Vec::new();
+        for i in 0..self.b {
+            band_counters.push(HashMap::new());
+        }
+
+        for id in ids {
+            let signature = self.id_signatures.get(&id).unwrap();
+            for i in 0..self.b {
+                let band: &[T] = &signature[self.band_range(i)];
+                let count = band_counters[i].entry(band).or_insert(1);
+                *count += 1;
+            }
+        }
+
+        let mut centroid = Vec::new();
+        for counter in band_counters {
+            let mut band_counts = counter.iter().collect::<Vec<(_, &usize)>>();
+            band_counts.sort_unstable_by(|a, b| b.1.cmp(a.1));
+            centroid.extend_from_slice(band_counts[0].0.clone());
+        }
+        centroid
+    }
+
+
 
     pub fn calculate_centroid_by_band_majority<S: BuildHasher>(
         &self,
@@ -549,7 +653,7 @@ where
         for id in ids {
             let signature = self.id_signatures.get(&id).unwrap();
             for i in 0..self.b {
-                let band: &[T] = &signature[i * self.r..(i + 1) * self.r];
+                let band: &[T] = &signature[self.band_range(i)];
                 let count = band_counters[i].entry(band).or_insert(1);
                 *count += 1;
             }
@@ -591,6 +695,42 @@ where
         }
         centroid
     }
+}
+
+
+impl<T, Id> QueryIndex for MinHashIndex<T, Id>
+    where
+        T: Hash + Eq,
+        Id: Hash + Eq + Clone {
+    type Id = Id;
+
+    fn query(&self, id: &Self::Id) -> HashSet<&Self::Id, FxBuildHasher> {
+        match self.id_signatures.get(id) {
+            Some(signature) => {
+                self.query(&signature)
+            }
+            None => HashSet::default()
+        }
+    }
+
+    /*
+    fn query_mut(&self, id: &Self::Id) -> HashSet<&mut Self::Id, FxBuildHasher> {
+        match self.id_signatures.get(id) {
+            Some(signature) => {
+                self.query(&signature)
+            }
+            None => HashSet::default()
+        }
+    }
+
+     */
+}
+
+pub fn calculate_minhash_index_params(jaccard_distance_threshold: f64,
+                                      num_perm: usize,
+                                      false_positive_weight: f64,
+                                      false_negative_weight: f64) -> (usize, usize) {
+    optimal_param(jaccard_distance_threshold, num_perm, false_positive_weight, false_negative_weight)
 }
 
 // Calculate optimal param
@@ -650,11 +790,13 @@ fn optimal_param(
     opt
 }
 
+
+
 #[cfg(test)]
 mod tests {
     use super::optimal_param;
     use crate::minhash::min_hash64::MinHash64V1;
-    use crate::minhash::{MinHash64, MinHashIndex};
+    use crate::minhash::{MinHash, MinHashIndex};
     use rand::distributions::{Distribution, Uniform};
     use rand::prelude::ThreadRng;
     use rand::{thread_rng, Rng};

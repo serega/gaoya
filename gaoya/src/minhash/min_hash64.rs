@@ -1,4 +1,4 @@
-use crate::minhash::compute_minhash_similarity;
+use crate::minhash::{compute_minhash_similarity, MinHash};
 use crate::minhash::hashers::Hashers;
 use rand::distributions::{Distribution, Uniform};
 use rand::{thread_rng, Rng};
@@ -7,34 +7,6 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
-pub trait MinHash64 {
-    fn create_signature<T, U>(&self, iter: T) -> Vec<u64>
-    where
-        T: Iterator<Item = U>,
-        U: Hash;
-
-    fn bulk_create_signature<U>(&self, batch: &Vec<Vec<U>>) -> Vec<Vec<u64>>
-    where
-        U: Hash + Sync,
-        Self: Sync,
-    {
-        batch
-            .par_iter()
-            .map(|tokens| self.create_signature(tokens.iter()))
-            .collect()
-    }
-
-    fn compute_similarity<T, U>(&self, iter_1: T, iter_2: T) -> f64
-    where
-        T: Iterator<Item = U>,
-        U: Hash,
-    {
-        compute_minhash_similarity(
-            &self.create_signature(iter_1),
-            &self.create_signature(iter_2),
-        )
-    }
-}
 
 #[derive(Clone)]
 pub struct MinHash64V1 {
@@ -111,7 +83,8 @@ impl MinHash64V1 {
     }
 }
 
-impl MinHash64 for MinHash64V1 {
+impl MinHash for MinHash64V1 {
+    type V = u64;
     fn create_signature<T, U>(&self, iter: T) -> Vec<u64>
     where
         T: Iterator<Item = U>,
@@ -156,7 +129,7 @@ impl MinHash64 for MinHash64V1 {
 mod tests {
     use super::MinHash64V1;
 
-    use crate::minhash::{centroid_minhash, compute_jaccard_similarity, MinHash64};
+    use crate::minhash::{centroid_minhash, compute_jaccard_similarity, MinHash};
     use crate::text::whitespace_split;
     use std::f64;
 

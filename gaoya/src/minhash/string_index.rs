@@ -1,6 +1,6 @@
 use crate::minhash::hashers::Hashers;
 use crate::minhash::min_hash64::MinHash64V1;
-use crate::minhash::{MinHash64, MinHashIndex};
+use crate::minhash::{MinHash, MinHashIndex};
 use crate::text::whitespace_split;
 use rayon::prelude::*;
 use std::collections::HashMap;

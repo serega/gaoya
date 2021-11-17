@@ -2,8 +2,7 @@ use pyo3::prelude::*;
 use pyo3::{PyObjectProtocol, PyClass, PyTypeInfo};
 
 use gaoya::minhash::{
-    compute_jaccard_similarity, Hashers, MinHash16, MinHash16V1, MinHash32, MinHash32V2, MinHash64,
-    MinHash64V1,
+    compute_jaccard_similarity, Hashers, MinHash, MinHash16V1, MinHash32V2, MinHash64V1,
 };
 use gaoya::text::whitespace_split;
 use pyo3::exceptions::PyValueError;
