@@ -5,3 +5,4 @@
 pub mod minhash;
 pub mod simhash;
 pub mod text;
+pub mod clustering;
