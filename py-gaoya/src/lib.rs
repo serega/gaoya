@@ -73,17 +73,27 @@ impl OnHeapTokenizer for WordShingleTokenizer {
     }
 }
 
+
 pub enum TokenizerOption {
     None,
     OnStack(Box<dyn OnStackTokenizer>),
     OnHeap(Box<dyn OnHeapTokenizer>)
 }
 
+unsafe impl Sync for TokenizerOption {}
+unsafe impl Send for TokenizerOption {}
+
+
 fn make_tokenizer(name: &str, range: Option<(usize, usize)>) -> TokenizerOption {
     if name == "char" {
-        match range {
-            Some(range) => OnStack(Box::new(CharShingletokenizer { range: range})),
-            None => TokenizerOption::None
+        return match range {
+            Some(range) => {
+                return OnStack(Box::new(CharShingletokenizer { range: range}))
+            },
+            None => {
+                println!("Invalid tokenizer {}", name);
+                TokenizerOption::None
+            }
         };
     } else if name == "word" {
         if range.is_some() {
@@ -92,6 +102,7 @@ fn make_tokenizer(name: &str, range: Option<(usize, usize)>) -> TokenizerOption 
             return OnStack(Box::new(WhiteSpaceTokenizer{}));
         }
     }
+    println!("Invalid tokenizer {}", name);
     TokenizerOption::None
 }
 

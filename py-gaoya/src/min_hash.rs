@@ -276,11 +276,21 @@ impl MinHash16StringIntIndex {
     }
 
     pub fn par_bulk_insert_docs(&mut self, ids: Vec<i64>, docs: Vec<&str>) {
-        let docs_tokens = docs
+        let hashes: Vec<_> = docs
             .par_iter()
-            .map(|doc| whitespace_split(doc).collect())
+            .map(|doc| {
+                match &self.tokenizer {
+                    TokenizerOption::OnStack(tokenizer) => {
+                        self.min_hash.create_signature(tokenizer.tokenize(doc))
+                    },
+                    TokenizerOption::OnHeap(tokenizer) => {
+                        self.min_hash.create_signature(tokenizer.tokenize(doc))
+                    },
+                    TokenizerOption::None => vec![]
+                }
+            })
             .collect();
-        self.par_bulk_insert_tokens(ids, docs_tokens);
+        self.inner.par_bulk_insert(ids, hashes);
     }
 
     pub fn bulk_insert_tokens(&mut self, ids: Vec<i64>, tokens: Vec<Vec<&str>>) {
@@ -302,9 +312,18 @@ impl MinHash16StringIntIndex {
         self.inner.query_owned(signature).into_iter().collect()
     }
 
-    pub fn query(&self, text: String) -> Vec<i64> {
-        let signature = &self.min_hash.create_signature(whitespace_split(text.as_str()));
-        self.inner.query_owned(signature).into_iter().collect()
+    pub fn query(&self, doc: String) -> Vec<i64> {
+        match &self.tokenizer {
+            TokenizerOption::OnStack(tokenizer) => {
+                let signature = &self.min_hash.create_signature(tokenizer.tokenize(doc.as_str()));
+                self.inner.query_owned(signature).into_iter().collect()
+            },
+            TokenizerOption::OnHeap(tokenizer) => {
+                let signature = &self.min_hash.create_signature(tokenizer.tokenize(doc.as_str()));
+                self.inner.query_owned(signature).into_iter().collect()
+            },
+            TokenizerOption::None => vec![]
+        }
     }
 
     pub fn size(&self) -> usize {
