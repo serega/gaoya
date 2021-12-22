@@ -13,9 +13,9 @@ use triomphe::Arc;
 
 /// Implementation of a parallel,  multi-threaded clustering algorithm.
 
-/// ClusterPointInner holds id of the point, and
-/// pointer to the cluster. Initially, cluster field of all points
-/// is null_ptr(). If a point belongs to a cluster the field cluster
+/// ClusterPointInner holds id of the point, and the pointer to the cluster.
+/// Initially, `cluster` field of all points is `null_ptr()`.
+/// If a point belongs to a cluster the field cluster
 /// will contain a pointer to a cluster in the heap.
 pub struct ClusterPointInner<Id> {
     pub id: Id,
@@ -23,7 +23,6 @@ pub struct ClusterPointInner<Id> {
 }
 
 unsafe impl<Id> Send for ClusterPointInner<Id> {}
-
 unsafe impl<Id> Sync for ClusterPointInner<Id> {}
 
 impl<Id> ClusterPointInner<Id>
@@ -46,7 +45,8 @@ where
     }
 
     /// Atomically assigns the cluster to this point
-    pub fn assign_cluster(
+    /// If this point already has a cluster assignment the assignment will fail
+    fn assign_cluster(
         &self,
         cluster_ptr: *mut Cluster<Id>,
     ) -> Result<*mut Cluster<Id>, *mut Cluster<Id>> {
@@ -106,26 +106,33 @@ impl<Id> Cluster<Id> {
     /// cluster state machine is simple. There are only 3 possible states and 2 transitions:
     /// NEW -> COMMITTED, NEW -> ROLLED_BACK
 
-    pub fn commit(&self) -> bool {
+
+    fn commit(&self) -> bool {
         self.state
             .compare_exchange(0, COMMITTED, Ordering::Relaxed, Ordering::Relaxed)
             .is_ok()
     }
-    pub fn rollback(&self) -> bool {
+
+    fn rollback(&self) -> bool {
         self.state
             .compare_exchange(0, ROLLED_BACK, Ordering::Relaxed, Ordering::Relaxed)
             .is_ok()
     }
 
-    pub fn is_rolled_back(&self) -> bool {
+    fn is_rolled_back(&self) -> bool {
         self.state.load(Ordering::Relaxed) == ROLLED_BACK
     }
 
-    pub fn is_commited(&self) -> bool {
+    fn is_commited(&self) -> bool {
         self.state.load(Ordering::Relaxed) == COMMITTED
     }
 }
 
+/// Parallel Clusterer searches clusters using multiple threads
+///
+///
+/// the same cluster from a different point.
+///
 pub struct Clusterer<Id> {
     cluster_id_sequence: AtomicU32,
     phandom: PhantomData<Id>,
