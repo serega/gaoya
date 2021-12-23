@@ -18,13 +18,13 @@ const MERSENNE_PRIME_31: u32 = (1 << 31) - 1;
 
 impl MinHash16V1 {
     pub fn new(num_hashes: usize) -> Self {
-        return Self::new_with_hasher(num_hashes, Hashers::Sip);
+        return Self::new_with_hasher(num_hashes, Hashers::Fnv);
     }
 
     pub fn new_with_hasher(num_hashes: usize, hashers: Hashers) -> Self {
         let mut rng = thread_rng();
-        let rand_range1 = Uniform::from(1..MERSENNE_PRIME_31);
-        let rand_range2 = Uniform::from(0..MERSENNE_PRIME_31);
+        let rand_range1 = Uniform::from(1..MERSENNE_PRIME_31 - 1);
+        let rand_range2 = Uniform::from(0..MERSENNE_PRIME_31 - 1 );
         MinHash16V1 {
             hashers: hashers,
             a: (0..num_hashes)
@@ -58,24 +58,19 @@ impl MinHash for MinHash16V1 {
             .map(|item| {
                 let mut hasher = self.my_hash_builder.build_hasher();
                 item.hash(&mut hasher);
-                hasher.finish() as u32
+                hasher.finish() as u32 % MERSENNE_PRIME_31
             })
             .collect::<Vec<_>>();
 
         match hashes.len() {
-            len if len > 0 => self
-                .a
-                .iter()
-                .zip(self.b.iter())
+            len if len > 0 => self.a.iter().zip(self.b.iter())
                 .map(|ab| {
-                    hashes
-                        .iter()
+                    hashes.iter()
                         .map(|hash| {
                             (hash.wrapping_mul(*ab.0).wrapping_add(*ab.1) % MERSENNE_PRIME_31)
                                 as u16
                         })
-                        .min()
-                        .unwrap()
+                        .min().unwrap()
                 })
                 .collect(),
             _ => vec![0; self.num_hashes],

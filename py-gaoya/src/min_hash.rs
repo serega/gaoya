@@ -4,11 +4,11 @@ use pyo3::{PyObjectProtocol, PyClass, PyTypeInfo};
 use gaoya::minhash::{
     compute_jaccard_similarity, Hashers, MinHash, MinHash16V1, MinHash32V2, MinHash64V1,
 };
-use gaoya::text::whitespace_split;
+use gaoya::text::{shingle_text, shingle_text_range, whitespace_split};
 use pyo3::exceptions::PyValueError;
 use rayon::prelude::*;
 use pyo3::class::impl_::PyClassImpl;
-use crate::{OnStackTokenizer, OnHeapTokenizer, TokenizerOption, make_tokenizer};
+use crate::{TokenizerSpecification};
 
 extern crate gaoya;
 
@@ -211,7 +211,7 @@ impl PyObjectProtocol for MinHash32StringIntIndex {
 struct MinHash16StringIntIndex {
     inner: gaoya::minhash::MinHashIndex<u16, i64>,
     min_hash: MinHash16V1,
-    tokenizer: TokenizerOption
+    tokenizer: TokenizerSpecification
 }
 
 #[pymethods]
@@ -235,7 +235,8 @@ impl MinHash16StringIntIndex {
         analyzer: &str,
         ngram_range: (usize, usize)
     ) -> PyResult<Self> {
-        let option_range = if ngram_range.0 == 1 && ngram_range.1 == 1 { Some(ngram_range) } else { None };
+        let option_range = if ngram_range.0 == 1 && ngram_range.1 == 1
+            { None } else { Some(ngram_range) };
         match Hashers::from_str(hashfunc) {
             Err(e) => Err(PyValueError::new_err(e)),
             Ok(hasher) => {
@@ -244,50 +245,40 @@ impl MinHash16StringIntIndex {
                         threshold, num_perm, fpw, fnw,
                     ),
                     min_hash: MinHash16V1::new_with_hasher(num_perm, hasher),
-                    tokenizer: make_tokenizer(analyzer, option_range)
+                    tokenizer: TokenizerSpecification::new(analyzer, option_range)
                 };
                 Ok(index)
             }
         }
     }
 
-    pub fn insert_document(&mut self, id: i64, doc: String) {
-        match &self.tokenizer {
-            TokenizerOption::OnStack(tokenizer) => {
-                self.inner.insert(
-                    id,
-                    self.min_hash.create_signature(tokenizer.tokenize(doc.as_str())),
-                );
+    pub fn tokenize_and_minhash(&self, doc: &str) -> Vec<u16> {
+        match &self.tokenizer{
+            TokenizerSpecification::CharShingle((from, Some(to))) => {
+                self.min_hash.create_signature(shingle_text_range(doc, *from, *to))
             },
-            TokenizerOption::OnHeap(tokenizer) => {
-                self.inner.insert(
-                    id,
-                    self.min_hash.create_signature(tokenizer.tokenize(doc.as_str())),
-                );
+            TokenizerSpecification::CharShingle((from, None)) => {
+                self.min_hash.create_signature(shingle_text(doc, *from))
             },
-            TokenizerOption::None => ()
+            TokenizerSpecification::WhiteSpace() => {
+                self.min_hash.create_signature(whitespace_split(doc))
+            }
         }
+    }
 
+    pub fn insert_document(&mut self, id: i64, doc: String) {
+        self.inner.insert(id, self.tokenize_and_minhash(doc.as_str()))
     }
 
     pub fn insert_tokens(&mut self, id: i64, tokens: Vec<&str>) {
-        self.inner
-            .insert(id, self.min_hash.create_signature(tokens.iter()));
+        self.inner.insert(id, self.min_hash.create_signature(tokens.iter()));
     }
 
     pub fn par_bulk_insert_docs(&mut self, ids: Vec<i64>, docs: Vec<&str>) {
         let hashes: Vec<_> = docs
             .par_iter()
             .map(|doc| {
-                match &self.tokenizer {
-                    TokenizerOption::OnStack(tokenizer) => {
-                        self.min_hash.create_signature(tokenizer.tokenize(doc))
-                    },
-                    TokenizerOption::OnHeap(tokenizer) => {
-                        self.min_hash.create_signature(tokenizer.tokenize(doc))
-                    },
-                    TokenizerOption::None => vec![]
-                }
+                self.tokenize_and_minhash(doc)
             })
             .collect();
         self.inner.par_bulk_insert(ids, hashes);
@@ -313,17 +304,7 @@ impl MinHash16StringIntIndex {
     }
 
     pub fn query(&self, doc: String) -> Vec<i64> {
-        match &self.tokenizer {
-            TokenizerOption::OnStack(tokenizer) => {
-                let signature = &self.min_hash.create_signature(tokenizer.tokenize(doc.as_str()));
-                self.inner.query_owned(signature).into_iter().collect()
-            },
-            TokenizerOption::OnHeap(tokenizer) => {
-                let signature = &self.min_hash.create_signature(tokenizer.tokenize(doc.as_str()));
-                self.inner.query_owned(signature).into_iter().collect()
-            },
-            TokenizerOption::None => vec![]
-        }
+        self.inner.query_owned(&self.tokenize_and_minhash(doc.as_str())).into_iter().collect()
     }
 
     pub fn size(&self) -> usize {

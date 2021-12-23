@@ -21,7 +21,7 @@ const MERSENNE_PRIME_31: u32 = (1 << 31) - 1;
 
 impl MinHash32V1 {
     pub fn new(num_hashes: usize) -> Self {
-        return MinHash32V1::new_with_hasher(num_hashes, Hashers::Sip);
+        return MinHash32V1::new_with_hasher(num_hashes, Hashers::Fnv);
     }
 
     pub fn new_with_hasher(num_hashes: usize, hashers: Hashers) -> Self {
