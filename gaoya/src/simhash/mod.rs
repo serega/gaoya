@@ -1,43 +1,44 @@
-mod sim_hash;
-mod sim_hasher;
-mod sim_hash_index;
 mod permutation;
+mod sim_hash;
+mod sim_hash_index;
+mod sim_hasher;
 
+pub use self::sim_hash::SimHash;
 pub use self::sim_hash_index::SimHashIndex;
 pub use self::sim_hash_index::SimHashTable;
-pub use self::sim_hasher::SimSipHasher64;
 pub use self::sim_hasher::SimSipHasher128;
-pub use self::sim_hash::SimHash;
+pub use self::sim_hasher::SimSipHasher64;
 
-use core::{mem, fmt};
+use core::{fmt, mem};
 
-
-use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, ShlAssign, Shr, Add, Mul, ShrAssign};
-use std::fmt::{Debug, Formatter};
+use num_traits::{One, Zero};
 use std::cmp::Ordering;
+use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
-use num::{Zero, One};
-
+use std::ops::{
+    Add, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Mul, Not, Shl, ShlAssign,
+    Shr, ShrAssign,
+};
 
 pub trait SimHashBits:
-Sized
-+ Clone
-+ Copy
-+ Zero
-+ One
-+ Debug
-+ PartialOrd
-+ PartialEq
-+ Not<Output=Self>
-+ BitAnd<Output=Self>
-+ BitOr<Output=Self>
-+ BitXor<Output=Self>
-+ BitOrAssign
-+ Shl<usize, Output=Self>
-+ Shr<usize, Output=Self>
-+ ShrAssign<usize>
-+ Hash
-+ Eq
+    Sized
+    + Clone
+    + Copy
+    + Zero
+    + One
+    + Debug
+    + PartialOrd
+    + PartialEq
+    + Not<Output = Self>
+    + BitAnd<Output = Self>
+    + BitOr<Output = Self>
+    + BitXor<Output = Self>
+    + BitOrAssign
+    + Shl<usize, Output = Self>
+    + Shr<usize, Output = Self>
+    + ShrAssign<usize>
+    + Hash
+    + Eq
 {
     fn count_ones(self) -> usize;
 
@@ -60,32 +61,26 @@ macro_rules! prim_int_impl {
 
             #[inline]
             fn to_u32_high_bits(self) -> u32 {
-                (self >> ( (mem::size_of::<$T>() * 8) - 32)) as u32
+                (self >> ((mem::size_of::<$T>() * 8) - 32)) as u32
             }
 
             #[inline]
             fn to_u64_high_bits(self) -> u64 {
-                (self >> ( (mem::size_of::<$T>() * 8) - 64)) as u64
+                (self >> ((mem::size_of::<$T>() * 8) - 64)) as u64
             }
-
 
             #[inline]
             fn hamming_distance(&self, rhs: &Self) -> usize {
                 (self ^ rhs).count_ones() as usize
             }
 
-             #[inline]
+            #[inline]
             fn bit_length() -> usize {
                 mem::size_of::<$T>() * 8
             }
         }
-    }
+    };
 }
-
 
 prim_int_impl!(u64, i64, u64);
 prim_int_impl!(u128, i128, u128);
-
-
-
-
