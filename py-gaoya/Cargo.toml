@@ -23,7 +23,7 @@ classifier = [
 
 [dependencies]
 libc = "0.2.106"
-pyo3 = { version = "0.14.5", features = ["extension-module"] }
+pyo3 = { version = "0.15.1", features = ["extension-module"] }
 rayon = "1.5.1"
 shingles = "0.1.1"
 
