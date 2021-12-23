@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 #![allow(unused)]
-#![feature(int_roundings)]
+//#![feature(get_mut_unchecked)]
 
 pub mod minhash;
 pub mod simhash;
 pub mod text;
+pub mod clustering;

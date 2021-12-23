@@ -2,42 +2,13 @@ use rand::{thread_rng, Rng, SeedableRng};
 use rand_pcg::Pcg32;
 use std::hash::{Hash, Hasher};
 
-use crate::minhash::compute_minhash_similarity;
+use crate::minhash::{compute_minhash_similarity, MinHash};
 use crate::minhash::hashers::Hashers;
 use rand::distributions::{Distribution, Uniform};
 use rand::seq::SliceRandom;
 use rayon::prelude::*;
 use std::cmp::min;
 use std::collections::HashMap;
-
-pub trait MinHash32 {
-    fn create_signature<T, U>(&self, iter: T) -> Vec<u32>
-    where
-        T: Iterator<Item = U>,
-        U: Hash;
-
-    fn bulk_create_signature<U>(&self, batch: &Vec<Vec<U>>) -> Vec<Vec<u32>>
-    where
-        U: Hash + Sync,
-        Self: Sync,
-    {
-        batch
-            .par_iter()
-            .map(|tokens| self.create_signature(tokens.iter()))
-            .collect()
-    }
-
-    fn compute_similarity<T, U>(&self, iter_1: T, iter_2: T) -> f64
-    where
-        T: Iterator<Item = U>,
-        U: Hash,
-    {
-        compute_minhash_similarity(
-            &self.create_signature(iter_1),
-            &self.create_signature(iter_2),
-        )
-    }
-}
 
 pub struct MinHash32V1 {
     hashers: Hashers,
@@ -50,7 +21,7 @@ const MERSENNE_PRIME_31: u32 = (1 << 31) - 1;
 
 impl MinHash32V1 {
     pub fn new(num_hashes: usize) -> Self {
-        return MinHash32V1::new_with_hasher(num_hashes, Hashers::Sip);
+        return MinHash32V1::new_with_hasher(num_hashes, Hashers::Fnv);
     }
 
     pub fn new_with_hasher(num_hashes: usize, hashers: Hashers) -> Self {
@@ -78,7 +49,8 @@ impl MinHash32V1 {
     }
 }
 
-impl MinHash32 for MinHash32V1 {
+impl MinHash for MinHash32V1 {
+    type V = u32;
     fn create_signature<T, U>(&self, iter: T) -> Vec<u32>
     where
         T: Iterator<Item = U>,
@@ -148,7 +120,8 @@ impl MinHash32V2 {
     }
 }
 
-impl MinHash32 for MinHash32V2 {
+impl MinHash for MinHash32V2 {
+    type V = u32;
     fn create_signature<T, U>(&self, iter: T) -> Vec<u32>
     where
         T: Iterator<Item = U>,
@@ -211,7 +184,8 @@ impl SuperMinHash32V1 {
     }
 }
 
-impl MinHash32 for SuperMinHash32V1 {
+impl MinHash for SuperMinHash32V1 {
+    type V = u32;
     fn create_signature<T, U>(&self, iter: T) -> Vec<u32>
     where
         T: Iterator<Item = U>,
@@ -258,7 +232,8 @@ impl SuperMinHash32V2 {
     }
 }
 
-impl MinHash32 for SuperMinHash32V2 {
+impl MinHash for SuperMinHash32V2 {
+    type V = u32;
     fn create_signature<T, U>(&self, iter: T) -> Vec<u32>
     where
         T: Iterator<Item = U>,
@@ -314,13 +289,12 @@ impl MinHash32 for SuperMinHash32V2 {
 
 #[cfg(test)]
 mod tests {
-    use super::MinHash32;
     use super::MinHash32V1;
     use super::MinHash32V2;
     use super::SuperMinHash32V1;
     use super::SuperMinHash32V2;
 
-    use crate::minhash::compute_jaccard_similarity;
+    use crate::minhash::{compute_jaccard_similarity, MinHash};
     use crate::minhash::compute_minhash_similarity;
     use crate::text::whitespace_split;
     use std::cmp::min;
@@ -357,7 +331,7 @@ mod tests {
         test_min_hash(&min_hash);
     }
 
-    fn test_min_hash<M: MinHash32>(min_hash: &M) {
+    fn test_min_hash<M: MinHash>(min_hash: &M) {
         let similarity = min_hash.compute_similarity(whitespace_split(S10), whitespace_split(S11)) as f32;
         let actual_similarity = compute_jaccard_similarity(whitespace_split(S10), whitespace_split(S11));
         println!("actual {} estimated {} ", actual_similarity, similarity);

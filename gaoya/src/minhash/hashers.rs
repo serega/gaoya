@@ -8,12 +8,14 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::str::FromStr;
+use fnv::FnvHasher;
 
 #[derive(Clone, Debug)]
 pub enum Hashers {
     Sip,
     Sha1,
     Sea,
+    Fnv
 }
 
 impl Hashers {
@@ -22,6 +24,7 @@ impl Hashers {
             Hashers::Sha1 => Box::new(Sha1Hasher::new()),
             Hashers::Sip => Box::new(SipHasher::new_with_keys(1, 2)),
             Hashers::Sea => Box::new(SeaHasher::new()),
+            Hashers::Fnv => Box::new(FnvHasher::default())
         }
     }
 
@@ -29,6 +32,7 @@ impl Hashers {
         match input.to_lowercase().as_str() {
             "sip" => Ok(Hashers::Sip),
             "sha1" => Ok(Hashers::Sha1),
+            "fnv" => Ok(Hashers::Fnv),
             _ => Err(format!(
                 "Unsupported hasher [{}]. Supported hashers [sip, sha1].",
                 input

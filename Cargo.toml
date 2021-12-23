@@ -2,5 +2,7 @@
 
 members = [
     "gaoya",
-    "py-gaoya"
+    "py-gaoya",
+    "gaoya-bench",
+
 ]

@@ -1,38 +1,10 @@
-use crate::minhash::{compute_minhash_similarity, Hashers};
+use crate::minhash::{compute_minhash_similarity, Hashers, MinHash};
 use rand::distributions::{Distribution, Uniform};
 use rand::thread_rng;
 use rayon::prelude::*;
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hash, Hasher};
 
-pub trait MinHash16 {
-    fn create_signature<T, U>(&self, iter: T) -> Vec<u16>
-    where
-        T: Iterator<Item = U>,
-        U: Hash;
-
-    fn bulk_create_signature<U>(&self, batch: &Vec<Vec<U>>) -> Vec<Vec<u16>>
-    where
-        U: Hash + Sync,
-        Self: Sync,
-    {
-        batch
-            .par_iter()
-            .map(|tokens| self.create_signature(tokens.iter()))
-            .collect()
-    }
-
-    fn compute_similarity<T, U>(&self, iter_1: T, iter_2: T) -> f64
-    where
-        T: Iterator<Item = U>,
-        U: Hash,
-    {
-        compute_minhash_similarity(
-            &self.create_signature(iter_1),
-            &self.create_signature(iter_2),
-        )
-    }
-}
 
 pub struct MinHash16V1 {
     hashers: Hashers,
@@ -46,13 +18,13 @@ const MERSENNE_PRIME_31: u32 = (1 << 31) - 1;
 
 impl MinHash16V1 {
     pub fn new(num_hashes: usize) -> Self {
-        return Self::new_with_hasher(num_hashes, Hashers::Sip);
+        return Self::new_with_hasher(num_hashes, Hashers::Fnv);
     }
 
     pub fn new_with_hasher(num_hashes: usize, hashers: Hashers) -> Self {
         let mut rng = thread_rng();
-        let rand_range1 = Uniform::from(1..MERSENNE_PRIME_31);
-        let rand_range2 = Uniform::from(0..MERSENNE_PRIME_31);
+        let rand_range1 = Uniform::from(1..MERSENNE_PRIME_31 - 1);
+        let rand_range2 = Uniform::from(0..MERSENNE_PRIME_31 - 1 );
         MinHash16V1 {
             hashers: hashers,
             a: (0..num_hashes)
@@ -75,7 +47,8 @@ impl MinHash16V1 {
     }
 }
 
-impl MinHash16 for MinHash16V1 {
+impl MinHash for MinHash16V1 {
+    type V = u16;
     fn create_signature<T, U>(&self, iter: T) -> Vec<u16>
     where
         T: Iterator<Item = U>,
@@ -85,24 +58,19 @@ impl MinHash16 for MinHash16V1 {
             .map(|item| {
                 let mut hasher = self.my_hash_builder.build_hasher();
                 item.hash(&mut hasher);
-                hasher.finish() as u32
+                hasher.finish() as u32 % MERSENNE_PRIME_31
             })
             .collect::<Vec<_>>();
 
         match hashes.len() {
-            len if len > 0 => self
-                .a
-                .iter()
-                .zip(self.b.iter())
+            len if len > 0 => self.a.iter().zip(self.b.iter())
                 .map(|ab| {
-                    hashes
-                        .iter()
+                    hashes.iter()
                         .map(|hash| {
                             (hash.wrapping_mul(*ab.0).wrapping_add(*ab.1) % MERSENNE_PRIME_31)
                                 as u16
                         })
-                        .min()
-                        .unwrap()
+                        .min().unwrap()
                 })
                 .collect(),
             _ => vec![0; self.num_hashes],
@@ -113,9 +81,7 @@ impl MinHash16 for MinHash16V1 {
 #[cfg(test)]
 mod tests {
 
-    use crate::minhash::{
-        centroid_minhash, compute_jaccard_similarity, MinHash16, MinHash16V1, MinHash64,
-    };
+    use crate::minhash::{centroid_minhash, compute_jaccard_similarity, MinHash, MinHash16V1};
     use crate::text::whitespace_split;
     use std::f64;
 
@@ -132,7 +98,7 @@ mod tests {
         let similarity = min_hash.compute_similarity(whitespace_split(S10), whitespace_split(S11)) as f32;
         let actual_similarity = compute_jaccard_similarity(whitespace_split(S10), whitespace_split(S11));
         println!("actual {} estimated {} ", actual_similarity, similarity);
-        assert!(f32::abs(similarity - 0.75) < 0.1);
+        assert!(f32::abs(similarity - 0.8) < 0.1);
 
         let estimated_similarity =
             min_hash.compute_similarity(whitespace_split(S1), whitespace_split(S3)) as f32;

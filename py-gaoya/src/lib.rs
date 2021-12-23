@@ -11,8 +11,7 @@ use sim_hash::init_simhash_module;
 use std::hash::Hash;
 use std::iter::Map;
 use shingles::Shingles;
-use crate::TokenizerOption::OnStack;
-use crate::TokenizerOption::OnHeap;
+use crate::TokenizerSpecification::{CharShingle, WhiteSpace};
 
 #[pymodule]
 fn gaoya(py: Python, module: &PyModule) -> PyResult<()> {
@@ -26,75 +25,23 @@ fn gaoya(py: Python, module: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
-/// OnStackTokenizer produces iterator of tokens as &str on stack.
-/// Can be used only for basic tokenization
-trait OnStackTokenizer {
-    fn tokenize<'a>(&self, text: &'a str) -> Box<dyn Iterator<Item=&'a str> + 'a>;
+
+pub enum TokenizerSpecification {
+    CharShingle((usize, Option<usize>)),
+    WhiteSpace(),
 }
 
-/// OnHeapTokenizer produces iterator of tokens as String on heap
-trait OnHeapTokenizer {
-    fn tokenize<'a>(&self, text: &'a str) -> Box<dyn Iterator<Item=String>>;
-}
-
-struct WhiteSpaceTokenizer {}
-
-impl OnStackTokenizer for WhiteSpaceTokenizer {
-    fn tokenize<'a>(&self, text: &'a str) -> Box<dyn Iterator<Item=&'a str> + 'a> {
-        whitespace_split_boxed(text)
-    }
-}
-
-struct CharShingletokenizer {
-    range: (usize, usize),
-}
-
-impl OnStackTokenizer for CharShingletokenizer {
-    fn tokenize<'a>(&self, text: &'a str) -> Box<dyn Iterator<Item=&'a str> + 'a> {
-        shingle_text_boxed(text, self.range.0)
-    }
-}
-
-
-struct WordShingleTokenizer {
-    range: (usize, usize),
-}
-
-impl OnHeapTokenizer for WordShingleTokenizer {
-    fn tokenize<'a>(&self, text: &'a str) -> Box<dyn Iterator<Item=String>> {
-        let words: Vec<_> = whitespace_split(text)
-            .collect();
-
-        let shingles: Shingles<[&str]> = Shingles::new(words.as_slice(), self.range.0);
-        let shingles_owned: Vec<_> = shingles.into_iter()
-            .map(|shingle| shingle.join(" "))
-            .collect();
-        Box::new(shingles_owned.into_iter())
-    }
-}
-
-pub enum TokenizerOption {
-    None,
-    OnStack(Box<dyn OnStackTokenizer>),
-    OnHeap(Box<dyn OnHeapTokenizer>)
-}
-
-fn make_tokenizer(name: &str, range: Option<(usize, usize)>) -> TokenizerOption {
-    if name == "char" {
-        match range {
-            Some(range) => OnStack(Box::new(CharShingletokenizer { range: range})),
-            None => TokenizerOption::None
-        };
-    } else if name == "word" {
-        if range.is_some() {
-            return OnHeap(Box::new(WordShingleTokenizer { range: range.unwrap()}));
+impl TokenizerSpecification {
+    pub fn new(name: &str, range: Option<(usize, usize)>) -> Self {
+        if name == "char" {
+            let range = range.unwrap();
+            if range.0 == range.1 {
+                return CharShingle((range.0, None));
+            } else {
+                return CharShingle((range.0, Some(range.1)));
+            }
         } else {
-            return OnStack(Box::new(WhiteSpaceTokenizer{}));
+            return WhiteSpace();
         }
     }
-    TokenizerOption::None
 }
-
-
-
-
