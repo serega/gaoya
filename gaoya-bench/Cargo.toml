@@ -17,4 +17,3 @@ debug = true
 itertools = "0.10.1"
 rand = "0.8.4"
 rayon = "1.5.1"
-

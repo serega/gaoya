@@ -13,10 +13,22 @@ pub struct GeneratedCluster {
     pub centroid: Vec<usize>,
 }
 
+/// DifferenceMode indicates whether the changes in the same cluster are in the same or
+/// different positions.
+///
+/// When DifferenceMode is SameIndices we choose num_changes random indices
+/// once per generated cluster, and change values in the positions corresponding to the indices
+/// in all cluster examples.
+///
+/// When DifferenceMode is DiffIndices we choose random indices for every cluster example.
+/// For example, given a list of elements [1,2,3,4,5,6] and num_changes equal to 2.
+/// SameIndices - choose (1,3). In all cluster examples we changes elements 2 and 4
+/// DiffIndices - choose two random indices for every cluster example.
+
 #[derive(Debug, PartialOrd, PartialEq)]
-pub enum Mode {
-    SAME_INDICES,
-    DIFF_INDICES,
+pub enum DifferenceMode {
+    SameIndices,
+    DiffIndices,
 }
 
 pub struct ClusterGenerator {
@@ -27,7 +39,7 @@ pub struct ClusterGenerator {
     pub min_value: usize,
     pub max_value: usize,
     pub num_changes: usize,
-    pub mode: Mode,
+    pub mode: DifferenceMode,
 }
 
 impl ClusterGenerator {
@@ -35,7 +47,7 @@ impl ClusterGenerator {
     pub fn new(jaccard_similarity: f64, cluster_size: usize,
                point_num_values: usize, num_clusters: usize,
                min_value: usize, max_value: usize,
-               mode: Mode ) -> Self {
+               mode: DifferenceMode) -> Self {
 
         ClusterGenerator {
             jaccard_similarity: jaccard_similarity,
@@ -53,7 +65,7 @@ impl ClusterGenerator {
         let point_id_seq = AtomicU32::new(0);
         self.num_changes = self.num_changes();
         println!("num changes {}", self.num_changes);
-        if self.mode == Mode::SAME_INDICES {
+        if self.mode == DifferenceMode::SameIndices {
             (0..self.num_clusters)
                 .into_par_iter()
                 .map(|i| self.generate_cluster_same_changed_indexes(&point_id_seq, i))
@@ -96,7 +108,7 @@ impl ClusterGenerator {
             .collect();
 
         let mut points = HashMap::with_capacity(self.cluster_size);
-        for i in 0..self.cluster_size {
+        for _ in 0..self.cluster_size {
             let mut point_items = sample.clone();
             for j in 0..self.num_changes {
                 let value = values_distribution.sample(&mut rng);
@@ -132,7 +144,7 @@ impl ClusterGenerator {
             point_id_sequence.fetch_add(1, Ordering::Relaxed),
             sample.clone(),
         );
-        for i in 0..self.cluster_size {
+        for _ in 0..self.cluster_size {
             let mut point_items = sample.clone();
             for _ in 0..self.num_changes {
                 let change_index = indices_distribution.sample(&mut rng);
