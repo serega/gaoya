@@ -84,6 +84,18 @@ where
         }
     }
 
+    pub fn new_with_capacity(band_start: isize, band_end: isize, capacity: usize) -> Self {
+        let mut hash_table = FxHashMap::default();
+        hash_table.reserve(capacity);
+        MinHashBand {
+            hash_table: hash_table,
+            band_start: band_start,
+            band_end: band_end,
+            len: (band_end - band_start) as usize,
+        }
+    }
+
+
     fn insert(&mut self, id: Id, signature: &Vec<T>) {
         let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
         let band_key = BandKey {
@@ -181,6 +193,10 @@ where
         }
     }
 
+    fn clear(&mut self) {
+        self.hash_table.clear();
+    }
+
     fn has_ids(&self, signature: &Vec<T>) -> bool {
         let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
         let band_key = BandKey {
@@ -193,7 +209,7 @@ where
         }
     }
 
-    fn shrink_to_fit(&mut self) {
+    pub fn shrink_to_fit(&mut self) {
         for item in self.hash_table.iter_mut() {
             item.1.shrink_to_fit();
         }
@@ -259,7 +275,6 @@ where
         MinHashIndex::new_with_weights(threshold, num_hashes, 0.5, 0.5)
     }
 
-
     pub fn new_with_params(num_bands: usize, band_width: usize, threshold: f64) -> Self {
         let mut bands = Vec::new();
         for i in 0..num_bands {
@@ -277,7 +292,25 @@ where
             r: band_width,
             size: 0,
         }
+    }
 
+    pub fn new_with_params_and_capacity(num_bands: usize, band_width: usize, threshold: f64, capacity: usize) -> Self {
+        let mut bands = Vec::new();
+        for i in 0..num_bands {
+            let (start, end) = (i * band_width, (i + 1) * band_width);
+            bands.push(MinHashBand::<T, Id>::new_with_capacity(start as isize, end as isize, capacity));
+        }
+        let mut hash_table = FxHashMap::default();
+        hash_table.reserve(capacity);
+        MinHashIndex {
+            bands: bands,
+            removed_ids: HashSet::new(),
+            threshold: threshold,
+            id_signatures: hash_table,
+            b: num_bands,
+            r: band_width,
+            size: 0,
+        }
     }
 
     pub fn get_keys(&self) -> Vec<Id> {
@@ -315,14 +348,14 @@ where
                     let id = item.1.clone();
                     band.insert(id, hashes);
                 }
-                band.shrink_to_fit();
             });
         }
         for id_hash in ids.into_iter().zip(signatures.into_iter()) {
-            self.id_signatures.insert(id_hash.0, id_hash.1);
-            self.size += 1;
+            match self.id_signatures.insert(id_hash.0, id_hash.1) {
+                None => self.size += 1,
+                Some(_) => ()
+            }
         }
-        self.id_signatures.shrink_to_fit();
     }
 
     pub fn par_bulk_insert_pairs(&mut self, id_signature_pairs: Vec<(Id, Vec<T>)>)
@@ -345,6 +378,20 @@ where
             self.size += 1;
         }
         self.id_signatures.shrink_to_fit();
+    }
+
+    pub fn shrink_to_fit(&mut self)
+    where Id: Send + Sync,
+          T: Send + Sync
+    {
+        self.bands.par_iter_mut()
+            .for_each(|band| band.shrink_to_fit());
+        self.id_signatures.shrink_to_fit();
+    }
+
+    pub fn clear(&mut self) {
+        self.bands.iter_mut().for_each(|band| band.clear());
+        self.id_signatures.clear();
     }
 
     pub fn query_one(&self, query_signature: &Vec<T>) -> Option<&Id> {
