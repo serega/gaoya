@@ -7,6 +7,7 @@ use std::any::type_name;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::hash::{BuildHasher, Hash, Hasher};
 use std::{fmt, slice};
+use std::fmt::{Display, Formatter};
 use std::ops::Range;
 use itertools::Itertools;
 use sha1::digest::generic_array::typenum::Cmp;
@@ -432,7 +433,7 @@ where
 
         match_ids.retain(|id| {
             let signature = &self.id_signatures[id];
-            compute_minhash_similarity(signature, query_signature) > self.threshold
+            compute_minhash_similarity(signature, query_signature) >= self.threshold
         });
 
         match_ids
@@ -476,7 +477,7 @@ where
         }
         match_ids.retain(|id| {
             let signature = &self.id_signatures[id];
-            compute_minhash_distance(signature, query_signature) < self.threshold
+            compute_minhash_similarity(signature, query_signature) >= self.threshold
         });
         match_ids
     }
@@ -743,6 +744,16 @@ where
         centroid
     }
 }
+
+// impl<T, Id> Display for MinHashIndex<T, Id> {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+//         write!(f, "MinHashIndex<{}, {}>, num_hashes = {}, size = {}",
+//                std::any::type_name::<T>(), std::any::type_name::<Id>(),
+//                self.num_perms(),
+//                self.size
+//         )
+//     }
+// }
 
 
 impl<T, Id> QueryIndex for MinHashIndex<T, Id>
