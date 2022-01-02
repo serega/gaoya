@@ -439,6 +439,21 @@ where
         match_ids
     }
 
+    pub fn query_by_id(&self, id: &Id) -> HashSet<&Id, FxBuildHasher> {
+        match self.id_signatures.get(id) {
+            Some(signature) => self.query(signature),
+            None => HashSet::default()
+        }
+    }
+
+    pub fn query_by_id_owned(&self, id: &Id) -> HashSet<Id, FxBuildHasher> {
+        match self.id_signatures.get(id) {
+            Some(signature) => self.query_owned(signature),
+            None => HashSet::default()
+        }
+    }
+
+
     /*
     pub fn query_mut(&mut self, query_signature: &Vec<T>) -> HashSet<&mut Id, FxBuildHasher>
         where
