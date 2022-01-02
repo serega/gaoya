@@ -153,7 +153,7 @@ mod tests {
             file.write_all(&bytes).unwrap();
             file.write_all("\n".as_bytes()).unwrap();
         }
-        let mut lsh_index = MinHashStringIndex::new(0.6, 128, 0.5, 0.5);
+        let mut lsh_index = MinHashStringIndex::new(0.5, 128, 0.5, 0.5);
 
         lsh_index.load_from_lines(&mut BufReader::new(file.as_slice()));
         assert_eq!(6, lsh_index.size());
