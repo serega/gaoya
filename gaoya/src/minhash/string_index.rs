@@ -1,19 +1,19 @@
-use crate::minhash::hashers::Hashers;
 use crate::minhash::min_hash64::MinHash64V1;
 use crate::minhash::{MinHash, MinHashIndex};
 use crate::text::whitespace_split;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Display, Formatter, write};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error};
 use std::io::{Read, Write};
+use fnv::FnvBuildHasher;
 
 
 pub struct MinHashStringIndex {
     lsh_index: MinHashIndex<u64, u64>,
-    min_hash: MinHash64V1,
+    min_hash: MinHash64V1<FnvBuildHasher>,
     doc_map: HashMap<u64, String>,
     doc_id: u64,
 }
@@ -22,34 +22,16 @@ impl Display for MinHashStringIndex {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "MinHashStringIndex {{ ");
         self.lsh_index.fmt(f);
-        write!(
-            f,
-            ", hasher = {} }}",
-            self.min_hash.get_hasher().to_string()
-        )
+        write!(f, " }} ")
     }
 }
 
 impl MinHashStringIndex {
+
     pub fn new(threshold: f64, num_perm: usize, fpw: f64, fnw: f64) -> Self {
         MinHashStringIndex {
             lsh_index: MinHashIndex::new_with_weights(threshold, num_perm, fpw, fnw),
             min_hash: MinHash64V1::new(num_perm),
-            doc_map: HashMap::new(),
-            doc_id: 0,
-        }
-    }
-
-    pub fn new_with_hasher(
-        threshold: f64,
-        num_perm: usize,
-        fpw: f64,
-        fnw: f64,
-        hashers: Hashers,
-    ) -> Self {
-        MinHashStringIndex {
-            lsh_index: MinHashIndex::new_with_weights(threshold, num_perm, fpw, fnw),
-            min_hash: MinHash64V1::new_with_hasher(num_perm, hashers),
             doc_map: HashMap::new(),
             doc_id: 0,
         }

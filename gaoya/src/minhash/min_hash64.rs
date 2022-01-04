@@ -1,16 +1,16 @@
-use crate::minhash::{compute_minhash_similarity, MinHash};
-use crate::minhash::hashers::Hashers;
+use crate::minhash::{compute_minhash_similarity, MinHash, MinHash32V1};
 use rand::distributions::{Distribution, Uniform};
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 use std::borrow::Borrow;
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
+use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher};
+use fnv::FnvBuildHasher;
 
 
 #[derive(Clone)]
-pub struct MinHash64V1 {
-    hashers: Hashers,
+pub struct MinHash64V1<B: BuildHasher> {
+    build_hasher: B,
     a: Vec<u64>,
     b: Vec<u64>,
     num_hashes: usize,
@@ -18,7 +18,7 @@ pub struct MinHash64V1 {
 
 static MERSENNE_PRIME: u64 = (1 << 61) - 1;
 
-impl MinHash64V1 {
+impl MinHash64V1<FnvBuildHasher> {
     /// Constructs a new `MinHash64V1` with a specified number of hash functions to use.
     /// ```
     /// use gaoya::minhash::MinHash64V1;
@@ -26,15 +26,18 @@ impl MinHash64V1 {
     /// let min_hash = MinHash64V1::new(100);
     /// ```
     pub fn new(num_hashes: usize) -> Self {
-        return MinHash64V1::new_with_hasher(num_hashes, Hashers::Sip);
+        return MinHash64V1::new_with_hasher(num_hashes, FnvBuildHasher::default());
     }
+}
 
-    pub fn new_with_hasher(num_hashes: usize, hashers: Hashers) -> Self {
+impl<B: BuildHasher> MinHash64V1<B> {
+
+    pub fn new_with_hasher(num_hashes: usize, build_hasher: B) -> Self {
         let mut rng = thread_rng();
         let rand_range1 = Uniform::from(1..MERSENNE_PRIME);
         let rand_range2 = Uniform::from(0..MERSENNE_PRIME);
         MinHash64V1 {
-            hashers: hashers,
+            build_hasher: build_hasher,
             a: (0..num_hashes)
                 .map(|_| rand_range1.sample(&mut rng))
                 .collect(),
@@ -43,10 +46,6 @@ impl MinHash64V1 {
                 .collect(),
             num_hashes,
         }
-    }
-
-    pub fn get_hasher(&self) -> &Hashers {
-        &self.hashers
     }
 
     /// Returns the number of hash functions being used in `MinHash`.
@@ -61,7 +60,7 @@ impl MinHash64V1 {
     {
         let hashes: Vec<u64> = iter
             .map(|item| {
-                let mut hasher = self.hashers.new_hasher();
+                let mut hasher = self.build_hasher.build_hasher();
                 item.hash(&mut hasher);
                 hasher.finish()
             })
@@ -83,7 +82,7 @@ impl MinHash64V1 {
     }
 }
 
-impl MinHash for MinHash64V1 {
+impl<B: BuildHasher> MinHash for MinHash64V1<B> {
     type V = u64;
     fn create_signature<T, U>(&self, iter: T) -> Vec<u64>
     where
@@ -92,7 +91,7 @@ impl MinHash for MinHash64V1 {
     {
         let hashes: Vec<u64> = iter
             .map(|item| {
-                let mut hasher = self.hashers.new_hasher();
+                let mut hasher = self.build_hasher.build_hasher();
                 item.hash(&mut hasher);
                 hasher.finish()
             })
@@ -114,15 +113,6 @@ impl MinHash for MinHash64V1 {
         }
     }
 
-    fn bulk_create_signature<U>(&self, batch: &Vec<Vec<U>>) -> Vec<Vec<u64>>
-    where
-        U: Hash + Sync,
-    {
-        batch
-            .par_iter()
-            .map(|tokens| self.create_signature(tokens.iter()))
-            .collect()
-    }
 }
 
 #[cfg(test)]
@@ -142,7 +132,7 @@ mod tests {
 
     #[test]
     fn test_min_hash_similarity() {
-        let min_hash: MinHash64V1 = MinHash64V1::new(200);
+        let min_hash = MinHash64V1::new(200);
         let similarity = min_hash.compute_similarity(whitespace_split(S10), whitespace_split(S11)) as f32;
         let actual_similarity = compute_jaccard_similarity(whitespace_split(S10), whitespace_split(S11));
         println!("actual {} estimated {} ", actual_similarity, similarity);

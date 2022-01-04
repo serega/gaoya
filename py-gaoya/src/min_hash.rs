@@ -2,20 +2,21 @@ use pyo3::prelude::*;
 use pyo3::{PyObjectProtocol, PyClass, PyTypeInfo};
 
 use gaoya::minhash::{
-    compute_jaccard_similarity, Hashers, MinHash, MinHash16V1, MinHash32V2, MinHash64V1,
+    compute_jaccard_similarity, MinHash, MinHash16V1, MinHash32V2, MinHash64V1,
 };
 use gaoya::text::{shingle_text, shingle_text_range, whitespace_split};
 use pyo3::exceptions::PyValueError;
 use rayon::prelude::*;
 use pyo3::class::impl_::PyClassImpl;
 use crate::{TokenizerSpecification};
+use fnv::FnvBuildHasher;
 
 extern crate gaoya;
 
 #[pyclass]
 struct Minhash64StringIntIndex {
     inner: gaoya::minhash::MinHashIndex<u64, i64>,
-    min_hash: MinHash64V1,
+    min_hash: MinHash64V1<FnvBuildHasher>,
 }
 
 #[pymethods]
@@ -26,27 +27,20 @@ impl Minhash64StringIntIndex {
         num_perm = "128",
         fpw = "0.5",
         fnw = "0.5",
-        hashfunc = "\"sip\""
     )]
     pub fn new(
         threshold: f64,
         num_perm: usize,
         fpw: f64,
         fnw: f64,
-        hashfunc: &str,
     ) -> PyResult<Self> {
-        match Hashers::from_str(hashfunc) {
-            Err(e) => Err(PyValueError::new_err(e)),
-            Ok(hasher) => {
-                let index = Minhash64StringIntIndex {
-                    inner: gaoya::minhash::MinHashIndex::new_with_weights(
-                        threshold, num_perm, fpw, fnw,
-                    ),
-                    min_hash: MinHash64V1::new_with_hasher(num_perm, hasher),
-                };
-                Ok(index)
-            }
-        }
+        let index = Minhash64StringIntIndex {
+            inner: gaoya::minhash::MinHashIndex::new_with_weights(
+                threshold, num_perm, fpw, fnw,
+            ),
+            min_hash: MinHash64V1::new(num_perm),
+        };
+        Ok(index)
     }
 
     pub fn insert_document(&mut self, id: i64, doc: String) {
@@ -113,7 +107,7 @@ impl PyObjectProtocol for Minhash64StringIntIndex {
 #[pyclass]
 struct MinHash32StringIntIndex {
     inner: gaoya::minhash::MinHashIndex<u32, i64>,
-    min_hash: MinHash32V2,
+    min_hash: MinHash32V2<FnvBuildHasher>,
 }
 
 #[pymethods]
@@ -123,8 +117,7 @@ impl MinHash32StringIntIndex {
         threshold = "0.5",
         num_perm = "128",
         fpw = "0.5",
-        fnw = "0.5",
-        hashfunc = "\"sip\""
+        fnw = "0.5"
     )]
     pub fn new(
         threshold: f64,
@@ -133,19 +126,16 @@ impl MinHash32StringIntIndex {
         fnw: f64,
         hashfunc: &str,
     ) -> PyResult<Self> {
-        match Hashers::from_str(hashfunc) {
-            Err(e) => Err(PyValueError::new_err(e)),
-            Ok(hasher) => {
-                let index = MinHash32StringIntIndex {
-                    inner: gaoya::minhash::MinHashIndex::new_with_weights(
-                        threshold, num_perm, fpw, fnw,
-                    ),
-                    min_hash: MinHash32V2::new_with_hasher(num_perm, hasher),
-                };
-                Ok(index)
-            }
-        }
+        let index = MinHash32StringIntIndex {
+            inner: gaoya::minhash::MinHashIndex::new_with_weights(
+                threshold, num_perm, fpw, fnw,
+            ),
+            min_hash: MinHash32V2::new(num_perm),
+        };
+        Ok(index)
     }
+
+
 
     pub fn insert_document(&mut self, id: i64, doc: String) {
         self.inner.insert(
@@ -210,7 +200,7 @@ impl PyObjectProtocol for MinHash32StringIntIndex {
 #[pyclass(unsendable)]
 struct MinHash16StringIntIndex {
     inner: gaoya::minhash::MinHashIndex<u16, i64>,
-    min_hash: MinHash16V1,
+    min_hash: MinHash16V1<FnvBuildHasher>,
     tokenizer: TokenizerSpecification
 }
 
@@ -222,7 +212,6 @@ impl MinHash16StringIntIndex {
         num_perm = "128",
         fpw = "0.5",
         fnw = "0.5",
-        hashfunc = "\"sip\"",
         analyzer = "\"word\"",
         ngram_range = "(1,1)",
     )]
@@ -236,20 +225,15 @@ impl MinHash16StringIntIndex {
         ngram_range: (usize, usize)
     ) -> PyResult<Self> {
         let option_range = if ngram_range.0 == 1 && ngram_range.1 == 1
-            { None } else { Some(ngram_range) };
-        match Hashers::from_str(hashfunc) {
-            Err(e) => Err(PyValueError::new_err(e)),
-            Ok(hasher) => {
-                let index = MinHash16StringIntIndex {
-                    inner: gaoya::minhash::MinHashIndex::new_with_weights(
-                        threshold, num_perm, fpw, fnw,
-                    ),
-                    min_hash: MinHash16V1::new_with_hasher(num_perm, hasher),
-                    tokenizer: TokenizerSpecification::new(analyzer, option_range)
-                };
-                Ok(index)
-            }
-        }
+        { None } else { Some(ngram_range) };
+        let index = MinHash16StringIntIndex {
+            inner: gaoya::minhash::MinHashIndex::new_with_weights(
+                threshold, num_perm, fpw, fnw,
+            ),
+            min_hash: MinHash16V1::new(num_perm),
+            tokenizer: TokenizerSpecification::new(analyzer, option_range),
+        };
+        Ok(index)
     }
 
     pub fn tokenize_and_minhash(&self, doc: &str) -> Vec<u16> {

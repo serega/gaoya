@@ -2,50 +2,17 @@ use core::convert::TryInto;
 use seahash::SeaHasher;
 use sha1::digest::Reset;
 use sha1::{Digest, Sha1};
-use siphasher::sip::SipHasher;
+use siphasher::sip::{SipHasher, SipHasher24};
 use std::error::Error;
 use std::fmt;
-use std::hash::{Hash, Hasher};
+use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher};
 use std::io::Write;
 use std::str::FromStr;
 use fnv::FnvHasher;
 
-#[derive(Clone, Debug)]
-pub enum Hashers {
-    Sip,
-    Sha1,
-    Sea,
-    Fnv
-}
 
-impl Hashers {
-    pub fn new_hasher(&self) -> Box<dyn Hasher> {
-        match self {
-            Hashers::Sha1 => Box::new(Sha1Hasher::new()),
-            Hashers::Sip => Box::new(SipHasher::new_with_keys(1, 2)),
-            Hashers::Sea => Box::new(SeaHasher::new()),
-            Hashers::Fnv => Box::new(FnvHasher::default())
-        }
-    }
+pub type SipHasher24BuildHasher = BuildHasherDefault<SipHasher24>;
 
-    pub fn from_str(input: &str) -> Result<Hashers, String> {
-        match input.to_lowercase().as_str() {
-            "sip" => Ok(Hashers::Sip),
-            "sha1" => Ok(Hashers::Sha1),
-            "fnv" => Ok(Hashers::Fnv),
-            _ => Err(format!(
-                "Unsupported hasher [{}]. Supported hashers [sip, sha1].",
-                input
-            )),
-        }
-    }
-}
-
-impl fmt::Display for Hashers {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
 
 pub struct Sha1Hasher {
     bytes: Vec<u8>,
@@ -70,3 +37,5 @@ impl Hasher for Sha1Hasher {
         self.bytes.extend_from_slice(bytes);
     }
 }
+
+
