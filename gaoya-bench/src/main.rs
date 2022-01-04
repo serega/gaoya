@@ -9,9 +9,10 @@ use std::io::{BufRead, BufReader};
 use std::ops::Bound::Included;
 use std::str::Split;
 use std::time::Instant;
+use fxhash::FxBuildHasher;
 use gaoya::clustering::clusterer_parallel::{Clusterer, ClusterPoint, ClusterPointInner};
 
-use gaoya::minhash::{Hashers, MinHash32V2, MinHash16V1, MinHashIndex, MinHash32V1, MinHash64V1, MinHash, calculate_minhash_index_params};
+use gaoya::minhash::{Hashers, MinHash32V2, MinHash16V1, MinHashIndex, MinHash32V1, MinHash64V1, MinHash, calculate_minhash_index_params, SipHasher24BuildHasher};
 use rayon::prelude::*;
 
 use itertools::Itertools;
@@ -82,12 +83,25 @@ fn run_clustering<M: MinHash>(generated_clusters: &Vec<GeneratedCluster>,
 
 
 fn main() {
-    let mut generator = ClusterGenerator::new(0.6, 200, 30, 1000, 0, 300_000, DifferenceMode::DiffIndices);
+    let mut generator = ClusterGenerator::new(0.6, 200, 30, 5000, 0, 300_000, DifferenceMode::SameIndices);
     let generated_clusters = generator.generate();
     println!("Generated {} clusters", generated_clusters.len());
-    let params = calculate_minhash_index_params(0.5, 256, 0.8, 0.2);
+    let params = calculate_minhash_index_params(0.5, 512, 0.2, 0.8);
     println!("{:?}", params);
-    run_clustering(&generated_clusters, MinHash32V1::new(params.0 * params.1), params.0, params.1, 0.5);
-    run_clustering(&generated_clusters, MinHash16V1::new(params.0 * params.1), params.0, params.1, 0.5);
-    run_clustering(&generated_clusters, MinHash64V1::new(params.0 * params.1), params.0, params.1, 0.5);
+
+    //run_clustering(&generated_clusters, MinHash16V1::new(params.0 * params.1), params.0, params.1, 0.6);
+    run_clustering(&generated_clusters, MinHash32V1::new(params.0 * params.1), params.0, params.1, 0.6);
+    //run_clustering(&generated_clusters, MinHash64V1::new(params.0 * params.1), params.0, params.1, 0.6);
+
+
+
+    // println!("\n");
+    // run_clustering(&generated_clusters, MinHash16V1::new_with_hasher(params.0 * params.1, FxBuildHasher::default()), params.0, params.1, 0.5);
+    // run_clustering(&generated_clusters, MinHash32V1::new_with_hasher(params.0 * params.1, FxBuildHasher::default()), params.0, params.1, 0.5);
+    // run_clustering(&generated_clusters, MinHash64V1::new_with_hasher(params.0 * params.1, FxBuildHasher::default()), params.0, params.1, 0.5);
+    //
+    // println!("\n");
+    // run_clustering(&generated_clusters, MinHash16V1::new_with_hasher(params.0 * params.1, SipHasher24BuildHasher::default()), params.0, params.1, 0.5);
+    // run_clustering(&generated_clusters, MinHash32V1::new_with_hasher(params.0 * params.1, SipHasher24BuildHasher::default()), params.0, params.1, 0.5);
+    // run_clustering(&generated_clusters, MinHash64V1::new_with_hasher(params.0 * params.1, SipHasher24BuildHasher::default()), params.0, params.1, 0.5);
 }

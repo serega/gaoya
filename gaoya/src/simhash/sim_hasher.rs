@@ -1,7 +1,7 @@
-use crate::minhash::Hashers::Sha1;
 use siphasher::sip::SipHasher;
 use siphasher::sip128::{Hasher128, SipHasher as SipHasher128};
 use std::hash::{Hash, Hasher};
+use crate::minhash::Sha1Hasher;
 
 pub trait SimHasher: Sized {
     type T;
@@ -55,7 +55,7 @@ impl SimHasher for ShaHasher64 {
         Self: Sized,
         U: Hash,
     {
-        let mut hasher = Sha1.new_hasher();
+        let mut hasher = Sha1Hasher::new();
         item.hash(&mut hasher);
         hasher.finish()
     }
