@@ -13,6 +13,8 @@ use itertools::Itertools;
 use sha1::digest::generic_array::typenum::Cmp;
 use crate::clustering::QueryIndex;
 
+
+
 /*
 MinHashIndex stores all minhashes as Vec<T> in a hashmap, and uses unsafe pointer arithmetic
 to access the band portion of the minhash directly in the vector.
@@ -240,7 +242,7 @@ where
     Id: Hash + Eq + Clone,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "MinHashIndex<{}> {{ threshold = {}, num_perms = {}, bands = {}, rows_per_band = {}, size = {} }}",
+        write!(f, "MinHashIndex<{}> {{ threshold = {}, num_hashes = {}, bands = {}, rows_per_band = {}, size = {} }}",
                type_name::<T>(),
                self.threshold, self.b * self.r, self.b, self.r, self.size)
     }
