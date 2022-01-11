@@ -1,9 +1,11 @@
 use pyo3::prelude::*;
 use pyo3::{PyClass, PyObjectProtocol, PyTypeInfo};
 
+
 use crate::TokenizerSpecification;
 use fnv::FnvBuildHasher;
-use gaoya::minhash::{compute_jaccard_similarity, MinHash, MinHash16V1, MinHash32V1,  MinHash32V2, MinHash64V1};
+use gaoya::minhash::{compute_jaccard_similarity, calculate_minhash_params,
+                     MinHash, MinHash16V1, MinHash32V1,  MinHash32V2, MinHash64V1};
 use gaoya::text::{shingle_text, shingle_text_range, whitespace_split};
 use pyo3::class::impl_::PyClassImpl;
 use pyo3::exceptions::PyValueError;
@@ -12,7 +14,9 @@ use rayon::prelude::*;
 extern crate gaoya;
 
 macro_rules! py_minhash_index {
-    ($name: ident, $type: ident, $minhash: ident, $hasher: ident) => {
+    ($name: ident, $type: ident, $stype: expr, $minhash: ident, $hasher: ident) => {
+        #[doc = concat!("MinHash", $stype, "StringIntIndex is a MinhashIndex that uses ", $stype, " hashes, ")]
+        #[doc = "for string values and integer keys."]
         #[pyclass(unsendable)]
         pub struct $name {
             pub inner: gaoya::minhash::MinHashIndex<$type, i64>,
@@ -23,18 +27,18 @@ macro_rules! py_minhash_index {
         impl $name {
             #[new]
             #[args(
-                threshold = "0.5",
-                num_perm = "128",
-                fpw = "0.5",
-                fnw = "0.5",
+                jaccard_threshold = "0.5",
+                num_bands = "42",
+                band_width = "3",
+                num_hashes = "126",
                 analyzer = "\"word\"",
                 ngram_range = "(1,1)"
             )]
             pub fn new(
-                threshold: f64,
-                num_hashes: usize,
-                fpw: f64,
-                fnw: f64,
+                jaccard_threshold: f64,
+                num_bands: Option<usize>,
+                band_width: Option<usize>,
+                num_hashes: Option<usize>,
                 analyzer: &str,
                 ngram_range: (usize, usize),
             ) -> PyResult<Self> {
@@ -43,14 +47,25 @@ macro_rules! py_minhash_index {
                 } else {
                     Some(ngram_range)
                 };
-                let index = $name {
-                    inner: gaoya::minhash::MinHashIndex::new_with_weights(
-                        threshold, num_hashes, fpw, fnw,
-                    ),
-                    min_hash: $minhash::new(num_hashes),
-                    tokenizer: TokenizerSpecification::new(analyzer, option_range),
-                };
-                Ok(index)
+
+                if let (Some(num_bands), Some(band_width)) = (num_bands, band_width) {
+                    let index = $name {
+                        inner: gaoya::minhash::MinHashIndex::new_with_params(num_bands, band_width, jaccard_threshold),
+                        min_hash: $minhash::new(num_bands * band_width),
+                        tokenizer: TokenizerSpecification::new(analyzer, option_range),
+                    };
+                    return Ok(index);
+                }
+                if let Some(num_hashes) = num_hashes {
+                    let (num_bands, band_width) = calculate_minhash_params(jaccard_threshold, num_hashes);
+                    let index = $name {
+                        inner: gaoya::minhash::MinHashIndex::new_with_params(num_bands, band_width, jaccard_threshold),
+                        min_hash: $minhash::new(num_bands * band_width),
+                        tokenizer: TokenizerSpecification::new(analyzer, option_range),
+                    };
+                    return Ok(index);
+                }
+                return Err(PyValueError::new_err("Either (num_bands, band_width) or num_hashes must be specified") );
             }
 
             pub fn tokenize_and_minhash(&self, doc: &str) -> Vec<$type> {
@@ -130,9 +145,9 @@ macro_rules! py_minhash_index {
     };
 }
 
-py_minhash_index!(MinHash64StringIntIndex, u64, MinHash64V1, FnvBuildHasher);
-py_minhash_index!(MinHash32StringIntIndex, u32, MinHash32V1, FnvBuildHasher);
-py_minhash_index!(MinHash16StringIntIndex, u16, MinHash16V1, FnvBuildHasher);
+py_minhash_index!(MinHash64StringIntIndex, u64, "64", MinHash64V1, FnvBuildHasher);
+py_minhash_index!(MinHash32StringIntIndex, u32, "32", MinHash32V1, FnvBuildHasher);
+py_minhash_index!(MinHash16StringIntIndex, u16, "16", MinHash16V1, FnvBuildHasher);
 
 
 pub fn init_minhash_module(m: &PyModule) -> PyResult<()> {

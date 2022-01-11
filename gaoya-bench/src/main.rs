@@ -12,7 +12,7 @@ use std::time::Instant;
 use fxhash::FxBuildHasher;
 use gaoya::clustering::clusterer_parallel::{Clusterer, ClusterPoint, ClusterPointInner};
 
-use gaoya::minhash::{Hashers, MinHash32V2, MinHash16V1, MinHashIndex, MinHash32V1, MinHash64V1, MinHash, calculate_minhash_index_params, SipHasher24BuildHasher};
+use gaoya::minhash::{MinHash32V2, MinHash16V1, MinHashIndex, MinHash32V1, MinHash64V1, MinHash, SipHasher24BuildHasher, calculate_minhash_params};
 use rayon::prelude::*;
 
 use itertools::Itertools;
@@ -39,7 +39,7 @@ fn run_clustering<M: MinHash>(generated_clusters: &Vec<GeneratedCluster>,
     let ids = ids.par_iter()
         .map(|id| ClusterPoint::new(ClusterPointInner::new(id.clone()))).collect();
     lsh.par_bulk_insert(ids, hashes);
-    println!("Starting clustering {}", std::any::type_name::<M>());
+    println!("Starting clustering {}", lsh);
     let clusterer = Clusterer::<u32>::new(50, 10);
     let mut points: Vec<ClusterPoint<u32>> = lsh.get_keys();
     let now = Instant::now();
@@ -83,10 +83,12 @@ fn run_clustering<M: MinHash>(generated_clusters: &Vec<GeneratedCluster>,
 
 
 fn main() {
-    let mut generator = ClusterGenerator::new(0.6, 200, 30, 5000, 0, 300_000, DifferenceMode::SameIndices);
+    let mut generator = ClusterGenerator::new(0.6, 200, 30, 3000, 0, 300_000, DifferenceMode::SameIndices);
     let generated_clusters = generator.generate();
     println!("Generated {} clusters", generated_clusters.len());
-    let params = calculate_minhash_index_params(0.5, 512, 0.2, 0.8);
+    //let params = calculate_b_and_r(0.6, 512, 0.99);
+    let params = (50, 5);
+    //let params = calculate_minhash_index_params(0.5,512, 0.2, 0.8);
     println!("{:?}", params);
 
     //run_clustering(&generated_clusters, MinHash16V1::new(params.0 * params.1), params.0, params.1, 0.6);

@@ -14,7 +14,6 @@ pub use self::min_hash32::{
 };
 pub use self::min_hash64::MinHash64V1;
 pub use self::minhash_index::MinHashIndex;
-pub use self::minhash_index::calculate_minhash_index_params;
 pub use self::string_index::MinHashStringIndex;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
@@ -181,4 +180,51 @@ fn centroid_minhash_from_refs<T>(minhashes: &Vec<&Vec<T>>) -> Vec<T>
 }
 
 
+/// Calculates number of bands `b` and band width `r` (number of rows) given
+/// the minimum `jaccard similarity`, number of hashes `num_hashes`, and desired
+/// probability `desired_proba` of two sets with similarity > `jaccard_similarity` to
+/// share a bucket
+/// For more info see 3.4.2 in http://infolab.stanford.edu/~ullman/mmds/ch3n.pdf
+///
+/// # Examples
+///
+/// ```
+/// use gaoya::minhash::calculate_minhash_params;
+/// let (b, r) = calculate_minhash_params(0.5, 128);
+/// assert_eq!(b, 32);
+/// assert_eq!(r, 4);
+///
+/// let (b, r) = calculate_minhash_params(0.7, 256);
+///  assert_eq!(b, 42);
+///  assert_eq!(r, 6);
+/// ```
+pub fn calculate_minhash_params(jaccard_similarity: f64, num_hashes: usize)
+    -> (usize, usize) {
+    calculate_b_and_r(jaccard_similarity, num_hashes, 0.99)
+}
+
+pub fn calculate_minhash_params_with_proba(jaccard_similarity: f64, num_hashes: usize, desired_proba: f64)
+                                -> (usize, usize) {
+    calculate_b_and_r(jaccard_similarity, num_hashes, desired_proba)
+}
+
+
+fn calculate_b_and_r(s: f64, n: usize, p: f64) -> (usize, usize) {
+    let proba = |b, r| {
+        1.0 - (1.0 - s.powf(r)).powf(b)
+    };
+    let mut b = n;
+    let mut r = 1;
+    while b > 1 {
+        let r1 = r + 1;
+        let b1 = n / r1;
+        if proba(b1 as f64, r1 as f64) > p {
+            b = b1;
+            r = r1;
+        } else {
+            break;
+        }
+    }
+    (b, r)
+}
 

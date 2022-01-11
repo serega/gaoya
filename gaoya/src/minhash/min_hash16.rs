@@ -23,9 +23,6 @@ impl MinHash16V1<FnvBuildHasher> {
 }
 
 impl<B: BuildHasher> MinHash16V1<B> {
-    // pub fn new(num_hashes: usize) -> Self {
-    //     return Self::new_with_hasher(num_hashes, FnvBuildHasher::default());
-    // }
 
     pub fn new_with_hasher(num_hashes: usize, build_hasher: B) -> Self {
         let mut rng = thread_rng();
