@@ -83,6 +83,18 @@ pub fn compute_jaccard_distance<T, U>(iter_1: T, iter_2: T) -> f32
     1.0 - compute_jaccard_similarity(iter_1, iter_2)
 }
 
+
+/// Calculates jaccard similarity between two minhashes
+/// # Examples
+///
+/// ```
+/// use gaoya::minhash::compute_minhash_similarity;
+///
+/// let m1 = [1, 2, 3, 4, 5, 6];
+/// let m2 = [1, 2, 3, 7, 5, 8];
+/// assert!((compute_minhash_similarity(&m1, &m2) - 0.666) < 0.01);
+///
+/// ```
 pub fn compute_minhash_similarity<T>(min_hashes_1: &[T], min_hashes_2: &[T]) -> f64
     where
         T: Eq,
