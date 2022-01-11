@@ -191,12 +191,12 @@ fn centroid_minhash_from_refs<T>(minhashes: &Vec<&Vec<T>>) -> Vec<T>
 /// ```
 /// use gaoya::minhash::calculate_minhash_params;
 /// let (b, r) = calculate_minhash_params(0.5, 128);
-/// assert_eq!(b, 32);
-/// assert_eq!(r, 4);
+/// assert_eq!(b, 42);
+/// assert_eq!(r, 3);
 ///
-/// let (b, r) = calculate_minhash_params(0.7, 256);
-///  assert_eq!(b, 42);
-///  assert_eq!(r, 6);
+/// let (b, r) = calculate_minhash_params(0.7, 196);
+///  assert_eq!(b, 39);
+///  assert_eq!(r, 5);
 /// ```
 pub fn calculate_minhash_params(jaccard_similarity: f64, num_hashes: usize)
     -> (usize, usize) {
