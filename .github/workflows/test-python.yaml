@@ -28,4 +28,4 @@ jobs:
           pip install -r py-gaoya/build.requirements.txt
       - name: Run tests
         run: |          
-          cd py-gaoya && make venv && make test
+          cd py-gaoya && make test
