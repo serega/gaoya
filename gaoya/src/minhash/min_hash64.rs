@@ -1,4 +1,4 @@
-use crate::minhash::{compute_minhash_similarity, MinHash, MinHash32V1};
+use crate::minhash::{compute_minhash_similarity, MinHasher, MinHasher32V1};
 use rand::distributions::{Distribution, Uniform};
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
@@ -9,7 +9,7 @@ use fnv::FnvBuildHasher;
 
 
 #[derive(Clone)]
-pub struct MinHash64V1<B: BuildHasher> {
+pub struct MinHasher64V1<B: BuildHasher> {
     build_hasher: B,
     a: Vec<u64>,
     b: Vec<u64>,
@@ -18,25 +18,25 @@ pub struct MinHash64V1<B: BuildHasher> {
 
 static MERSENNE_PRIME: u64 = (1 << 61) - 1;
 
-impl MinHash64V1<FnvBuildHasher> {
+impl MinHasher64V1<FnvBuildHasher> {
     /// Constructs a new `MinHash64V1` with a specified number of hash functions to use.
     /// ```
-    /// use gaoya::minhash::MinHash64V1;
+    /// use gaoya::minhash::MinHasher64V1;
     ///
-    /// let min_hash = MinHash64V1::new(100);
+    /// let min_hash = MinHasher64V1::new(100);
     /// ```
     pub fn new(num_hashes: usize) -> Self {
-        return MinHash64V1::new_with_hasher(num_hashes, FnvBuildHasher::default());
+        return MinHasher64V1::new_with_hasher(num_hashes, FnvBuildHasher::default());
     }
 }
 
-impl<B: BuildHasher> MinHash64V1<B> {
+impl<B: BuildHasher> MinHasher64V1<B> {
 
     pub fn new_with_hasher(num_hashes: usize, build_hasher: B) -> Self {
         let mut rng = thread_rng();
         let rand_range1 = Uniform::from(1..MERSENNE_PRIME);
         let rand_range2 = Uniform::from(0..MERSENNE_PRIME);
-        MinHash64V1 {
+        MinHasher64V1 {
             build_hasher: build_hasher,
             a: (0..num_hashes)
                 .map(|_| rand_range1.sample(&mut rng))
@@ -82,7 +82,7 @@ impl<B: BuildHasher> MinHash64V1<B> {
     }
 }
 
-impl<B: BuildHasher> MinHash for MinHash64V1<B> {
+impl<B: BuildHasher> MinHasher for MinHasher64V1<B> {
     type V = u64;
     fn create_signature<T, U>(&self, iter: T) -> Vec<u64>
     where
@@ -117,9 +117,9 @@ impl<B: BuildHasher> MinHash for MinHash64V1<B> {
 
 #[cfg(test)]
 mod tests {
-    use super::MinHash64V1;
+    use super::MinHasher64V1;
 
-    use crate::minhash::{centroid_minhash, compute_jaccard_similarity, MinHash};
+    use crate::minhash::{centroid_minhash, compute_jaccard_similarity, MinHasher};
     use crate::text::whitespace_split;
     use std::f64;
 
@@ -132,7 +132,7 @@ mod tests {
 
     #[test]
     fn test_min_hash_similarity() {
-        let min_hash = MinHash64V1::new(200);
+        let min_hash = MinHasher64V1::new(200);
         let similarity = min_hash.compute_similarity(whitespace_split(S10), whitespace_split(S11)) as f32;
         let actual_similarity = compute_jaccard_similarity(whitespace_split(S10), whitespace_split(S11));
         println!("actual {} estimated {} ", actual_similarity, similarity);
