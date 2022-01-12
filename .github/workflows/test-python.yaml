@@ -2,12 +2,15 @@ name: Test python
 
 on:
   push:
-    branches:
-      - *
+    paths:
+      - 'py-gaoya/**'
+      - 'gaoya/**'
 
   pull_request:
-    branches:
-      - *
+    paths:
+      - 'py-gaoya/**'
+      - 'gaoya/**'
+
 jobs:
   test-python:
     name: Build and test Python
