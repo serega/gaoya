@@ -8,7 +8,6 @@ venv:
 	python -m venv venv
 	venv/bin/pip install -U pip
 	venv/bin/pip install -r build.requirements.txt
-	source venv/bin/activate
 
 clean:
 	rm -r venv
@@ -24,8 +23,8 @@ pre-commit: venv
 	cargo fmt --all
 
 test: venv
-	source venv/bin/activate
-	$(PYTHON_BIN)/maturin develop
+	source venv/bin/activate; \
+	$(PYTHON_BIN)/maturin develop; \
 	$(PYTHON) -m pytest tests
 
 test-with-cov: venv
