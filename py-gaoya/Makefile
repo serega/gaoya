@@ -8,7 +8,7 @@ venv:
 	@python -m venv venv
 	@venv/bin/pip install -U pip
 	@venv/bin/pip install -r build.requirements.txt
-	@unset CONDA_PREFIX && source venv/bin/activate && maturin develop
+	@source venv/bin/activate && maturin develop
 
 clean:
 	@rm -r venv
