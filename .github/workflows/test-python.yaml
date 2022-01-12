@@ -1,15 +1,7 @@
 name: Test python
 
-on:
-  push:
-    paths:
-      - 'py-gaoya/**'
-      - 'gaoya/**'
-
-  pull_request:
-    paths:
-      - 'py-gaoya/**'
-      - 'gaoya/**'
+# Triggers the workflow on push or pull request events
+on: [push, pull_request]
 
 jobs:
   test-python:
