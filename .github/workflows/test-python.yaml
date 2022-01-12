@@ -29,6 +29,4 @@ jobs:
       - name: Run tests
         run: |
           export RUSTFLAGS="-C debuginfo=0"
-          cd py-gaoya
-          maturin develop
-          python -m pytest
+          cd py-gaoya && make venv && make test
