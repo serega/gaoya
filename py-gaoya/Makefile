@@ -5,14 +5,14 @@ PYTHON_BIN=venv/bin
 .PHONY: pre-commit test pip clean
 
 venv:
-	@python -m venv venv
-	@venv/bin/pip install -U pip
-	@venv/bin/pip install -r build.requirements.txt
-	@source venv/bin/activate
+	python -m venv venv
+	venv/bin/pip install -U pip
+	venv/bin/pip install -r build.requirements.txt
+	source venv/bin/activate
 
 clean:
-	@rm -r venv
-	@rm -r target/
+	rm -r venv
+	rm -r target/
 
 pre-commit: venv
 	$(PYTHON_BIN)/isort .
@@ -24,6 +24,7 @@ pre-commit: venv
 	cargo fmt --all
 
 test: venv
+	source venv/bin/activate
 	$(PYTHON_BIN)/maturin develop
 	$(PYTHON) -m pytest tests
 
