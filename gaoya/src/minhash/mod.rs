@@ -6,14 +6,14 @@ mod min_hash64;
 mod minhash_index;
 mod string_index;
 
-pub use self::hashers::Hashers;
-pub use self::min_hash16::MinHash16V1;
+pub use self::hashers::SipHasher24BuildHasher;
+pub use self::hashers::Sha1Hasher;
+pub use self::min_hash16::MinHasher16V1;
 pub use self::min_hash32::{
-    MinHash32V1, MinHash32V2, SuperMinHash32V1, SuperMinHash32V2,
+    MinHasher32V1, MinHasher32V2, SuperMinHasher32V1, SuperMinHash32V2,
 };
-pub use self::min_hash64::MinHash64V1;
+pub use self::min_hash64::MinHasher64V1;
 pub use self::minhash_index::MinHashIndex;
-pub use self::minhash_index::calculate_minhash_index_params;
 pub use self::string_index::MinHashStringIndex;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
@@ -22,7 +22,7 @@ use fxhash::FxBuildHasher;
 use rayon::prelude::*;
 
 
-pub trait MinHash {
+pub trait MinHasher {
     /// The data type of individual hash.
     /// This should be one of u-numeric types such as u64, u32, u16, u8
     type V: Hash + Eq + Sync + Send;
@@ -83,6 +83,18 @@ pub fn compute_jaccard_distance<T, U>(iter_1: T, iter_2: T) -> f32
     1.0 - compute_jaccard_similarity(iter_1, iter_2)
 }
 
+
+/// Calculates jaccard similarity between two minhashes
+/// # Examples
+///
+/// ```
+/// use gaoya::minhash::compute_minhash_similarity;
+///
+/// let m1 = [1, 2, 3, 4, 5, 6];
+/// let m2 = [1, 2, 3, 7, 5, 8];
+/// assert!((compute_minhash_similarity(&m1, &m2) - 0.666) < 0.01);
+///
+/// ```
 pub fn compute_minhash_similarity<T>(min_hashes_1: &[T], min_hashes_2: &[T]) -> f64
     where
         T: Eq,
@@ -180,4 +192,51 @@ fn centroid_minhash_from_refs<T>(minhashes: &Vec<&Vec<T>>) -> Vec<T>
 }
 
 
+/// Calculates number of bands `b` and band width `r` (number of rows) given
+/// the minimum `jaccard similarity`, number of hashes `num_hashes`, and desired
+/// probability `desired_proba` of two sets with similarity > `jaccard_similarity` to
+/// share a bucket
+/// For more info see 3.4.2 in http://infolab.stanford.edu/~ullman/mmds/ch3n.pdf
+///
+/// # Examples
+///
+/// ```
+/// use gaoya::minhash::calculate_minhash_params;
+/// let (b, r) = calculate_minhash_params(0.5, 128);
+/// assert_eq!(b, 42);
+/// assert_eq!(r, 3);
+///
+/// let (b, r) = calculate_minhash_params(0.7, 196);
+///  assert_eq!(b, 39);
+///  assert_eq!(r, 5);
+/// ```
+pub fn calculate_minhash_params(jaccard_similarity: f64, num_hashes: usize)
+    -> (usize, usize) {
+    calculate_b_and_r(jaccard_similarity, num_hashes, 0.99)
+}
+
+pub fn calculate_minhash_params_with_proba(jaccard_similarity: f64, num_hashes: usize, desired_proba: f64)
+                                -> (usize, usize) {
+    calculate_b_and_r(jaccard_similarity, num_hashes, desired_proba)
+}
+
+
+fn calculate_b_and_r(s: f64, n: usize, p: f64) -> (usize, usize) {
+    let proba = |b, r| {
+        1.0 - (1.0 - s.powf(r)).powf(b)
+    };
+    let mut b = n;
+    let mut r = 1;
+    while b > 1 {
+        let r1 = r + 1;
+        let b1 = n / r1;
+        if proba(b1 as f64, r1 as f64) > p {
+            b = b1;
+            r = r1;
+        } else {
+            break;
+        }
+    }
+    (b, r)
+}
 

@@ -204,7 +204,7 @@ where
                 .filter(|point| !point.is_cluster_assigned())
                 .collect();
 
-            if similar_points.len() > self.min_cluster_size {
+            if similar_points.len() >= self.min_cluster_size {
                 let mut similar_points_cloned =
                     similar_points.into_iter().map(|p| p.clone()).collect();
                 match self.try_create_cluster(&mut similar_points_cloned) {
