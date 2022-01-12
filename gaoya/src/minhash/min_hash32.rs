@@ -2,7 +2,7 @@ use rand::{thread_rng, Rng, SeedableRng};
 use rand_pcg::Pcg32;
 use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher};
 
-use crate::minhash::{compute_minhash_similarity, MinHash};
+use crate::minhash::{compute_minhash_similarity, MinHasher};
 use crate::minhash::hashers::{SipHasher24BuildHasher};
 use rand::distributions::{Distribution, Uniform};
 use rand::seq::SliceRandom;
@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use fnv::FnvBuildHasher;
 use siphasher::sip::{SipHasher, SipHasher24};
 
-pub struct MinHash32V1<B: BuildHasher> {
+pub struct MinHasher32V1<B: BuildHasher> {
     build_hasher: B,
     a: Vec<u32>,
     b: Vec<u32>,
@@ -23,18 +23,18 @@ pub struct MinHash32V1<B: BuildHasher> {
 const MERSENNE_PRIME_31: u32 = (1 << 31) - 1;
 
 
-impl MinHash32V1<FnvBuildHasher> {
+impl MinHasher32V1<FnvBuildHasher> {
     pub fn new(num_hashes: usize) -> Self {
-        return MinHash32V1::new_with_hasher(num_hashes, FnvBuildHasher::default());
+        return MinHasher32V1::new_with_hasher(num_hashes, FnvBuildHasher::default());
     }
 }
 
-impl<B: BuildHasher> MinHash32V1<B> {
+impl<B: BuildHasher> MinHasher32V1<B> {
     pub fn new_with_hasher(num_hashes: usize, build_hasher: B) -> Self {
         let mut rng = thread_rng();
         let rand_range1 = Uniform::from(1..MERSENNE_PRIME_31);
         let rand_range2 = Uniform::from(0..MERSENNE_PRIME_31);
-        MinHash32V1 {
+        MinHasher32V1 {
             build_hasher: build_hasher,
             a: (0..num_hashes)
                 .map(|_| rand_range1.sample(&mut rng))
@@ -52,7 +52,7 @@ impl<B: BuildHasher> MinHash32V1<B> {
     }
 }
 
-impl<B: BuildHasher> MinHash for MinHash32V1<B> {
+impl<B: BuildHasher> MinHasher for MinHasher32V1<B> {
     type V = u32;
     fn create_signature<T, U>(&self, iter: T) -> Vec<u32>
     where
@@ -88,7 +88,7 @@ impl<B: BuildHasher> MinHash for MinHash32V1<B> {
 }
 
 ////////////////       MinHash32V2    ///////////////////////
-pub struct MinHash32V2<B: BuildHasher> {
+pub struct MinHasher32V2<B: BuildHasher> {
     build_hasher: B,
     a: Vec<u64>,
     b: Vec<u64>,
@@ -97,19 +97,19 @@ pub struct MinHash32V2<B: BuildHasher> {
 
 const MERSENNE_PRIME_61: u64 = (1 << 61) - 1;
 
-impl MinHash32V2<FnvBuildHasher> {
+impl MinHasher32V2<FnvBuildHasher> {
     pub fn new(num_hashes: usize) -> Self {
-        return MinHash32V2::new_with_hasher(num_hashes, FnvBuildHasher::default());
+        return MinHasher32V2::new_with_hasher(num_hashes, FnvBuildHasher::default());
     }
 }
 
-impl<B: BuildHasher> MinHash32V2<B> {
+impl<B: BuildHasher> MinHasher32V2<B> {
 
     pub fn new_with_hasher(num_hashes: usize, build_hasher: B) -> Self {
         let mut rng = thread_rng();
         let rand_range1 = Uniform::from(1..u32::MAX as u64);
         let rand_range2 = Uniform::from(0..u32::MAX as u64);
-        MinHash32V2 {
+        MinHasher32V2 {
             build_hasher: build_hasher,
             a: (0..num_hashes)
                 .map(|_| rand_range1.sample(&mut rng))
@@ -122,7 +122,7 @@ impl<B: BuildHasher> MinHash32V2<B> {
     }
 }
 
-impl<B: BuildHasher> MinHash for MinHash32V2<B> {
+impl<B: BuildHasher> MinHasher for MinHasher32V2<B> {
     type V = u32;
     fn create_signature<T, U>(&self, iter: T) -> Vec<u32>
     where
@@ -164,29 +164,29 @@ impl<B: BuildHasher> MinHash for MinHash32V2<B> {
 // SuperMinHash – A New Minwise Hashing Algorithm for Jaccard Similarity Estimation
 // https://arxiv.org/pdf/1706.05698.pdf
 
-pub struct SuperMinHash32V1<B: BuildHasher> {
+pub struct SuperMinHasher32V1<B: BuildHasher> {
     build_hasher: B,
     num_hashes: usize,
 }
 
-impl SuperMinHash32V1<FnvBuildHasher> {
+impl SuperMinHasher32V1<FnvBuildHasher> {
     pub fn new(num_hashes: usize) -> Self {
-        return SuperMinHash32V1::new_with_hasher(num_hashes, FnvBuildHasher::default());
+        return SuperMinHasher32V1::new_with_hasher(num_hashes, FnvBuildHasher::default());
     }
 
 }
 
-impl<B: BuildHasher> SuperMinHash32V1<B> {
+impl<B: BuildHasher> SuperMinHasher32V1<B> {
 
     pub fn new_with_hasher(num_hashes: usize, build_hasher: B) -> Self {
-        SuperMinHash32V1 {
+        SuperMinHasher32V1 {
             build_hasher: build_hasher,
             num_hashes,
         }
     }
 }
 
-impl<B: BuildHasher> MinHash for SuperMinHash32V1<B> {
+impl<B: BuildHasher> MinHasher for SuperMinHasher32V1<B> {
     type V = u32;
     fn create_signature<T, U>(&self, iter: T) -> Vec<u32>
     where
@@ -234,7 +234,7 @@ impl<B: BuildHasher> SuperMinHash32V2<B> {
 
 }
 
-impl<B: BuildHasher> MinHash for SuperMinHash32V2<B> {
+impl<B: BuildHasher> MinHasher for SuperMinHash32V2<B> {
     type V = u32;
     fn create_signature<T, U>(&self, iter: T) -> Vec<u32>
     where
@@ -291,12 +291,12 @@ impl<B: BuildHasher> MinHash for SuperMinHash32V2<B> {
 
 #[cfg(test)]
 mod tests {
-    use super::MinHash32V1;
-    use super::MinHash32V2;
-    use super::SuperMinHash32V1;
+    use super::MinHasher32V1;
+    use super::MinHasher32V2;
+    use super::SuperMinHasher32V1;
     use super::SuperMinHash32V2;
 
-    use crate::minhash::{compute_jaccard_similarity, MinHash};
+    use crate::minhash::{compute_jaccard_similarity, MinHasher};
     use crate::minhash::compute_minhash_similarity;
     use crate::text::whitespace_split;
     use std::cmp::min;
@@ -311,19 +311,19 @@ mod tests {
 
     #[test]
     fn test_min_hash_v1() {
-        let min_hash = MinHash32V1::new(128);
+        let min_hash = MinHasher32V1::new(128);
         test_min_hash(&min_hash);
     }
 
     #[test]
     fn test_min_hash_v2() {
-        let min_hash = MinHash32V2::new(128);
+        let min_hash = MinHasher32V2::new(128);
         test_min_hash(&min_hash);
     }
 
     #[test]
     fn test_super_min_hash_v1() {
-        let min_hash = SuperMinHash32V1::new(128);
+        let min_hash = SuperMinHasher32V1::new(128);
         test_min_hash(&min_hash);
     }
 
@@ -333,7 +333,7 @@ mod tests {
         test_min_hash(&min_hash);
     }
 
-    fn test_min_hash<M: MinHash>(min_hash: &M) {
+    fn test_min_hash<M: MinHasher>(min_hash: &M) {
         let similarity = min_hash.compute_similarity(whitespace_split(S10), whitespace_split(S11)) as f32;
         let actual_similarity = compute_jaccard_similarity(whitespace_split(S10), whitespace_split(S11));
         println!("actual {} estimated {} ", actual_similarity, similarity);

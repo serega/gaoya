@@ -1,5 +1,5 @@
-use crate::minhash::min_hash64::MinHash64V1;
-use crate::minhash::{MinHash, MinHashIndex};
+use crate::minhash::min_hash64::MinHasher64V1;
+use crate::minhash::{MinHasher, MinHashIndex};
 use crate::text::whitespace_split;
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -13,7 +13,7 @@ use fnv::FnvBuildHasher;
 
 pub struct MinHashStringIndex {
     lsh_index: MinHashIndex<u64, u64>,
-    min_hash: MinHash64V1<FnvBuildHasher>,
+    min_hash: MinHasher64V1<FnvBuildHasher>,
     doc_map: HashMap<u64, String>,
     doc_id: u64,
 }
@@ -31,7 +31,7 @@ impl MinHashStringIndex {
     pub fn new(num_bands: usize, band_width: usize, jaccard_threshold: f64) -> Self {
         MinHashStringIndex {
             lsh_index: MinHashIndex::new_with_params(num_bands, band_width, jaccard_threshold),
-            min_hash: MinHash64V1::new(num_bands * band_width),
+            min_hash: MinHasher64V1::new(num_bands * band_width),
             doc_map: HashMap::new(),
             doc_id: 0,
         }

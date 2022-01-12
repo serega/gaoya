@@ -5,7 +5,7 @@ use pyo3::{PyClass, PyObjectProtocol, PyTypeInfo};
 use crate::TokenizerSpecification;
 use fnv::FnvBuildHasher;
 use gaoya::minhash::{compute_jaccard_similarity, calculate_minhash_params,
-                     MinHash, MinHash16V1, MinHash32V1,  MinHash32V2, MinHash64V1};
+                     MinHasher, MinHasher16V1, MinHasher32V1, MinHasher32V2, MinHasher64V1};
 use gaoya::text::{shingle_text, shingle_text_range, whitespace_split};
 use pyo3::class::impl_::PyClassImpl;
 use pyo3::exceptions::PyValueError;
@@ -145,9 +145,9 @@ macro_rules! py_minhash_index {
     };
 }
 
-py_minhash_index!(MinHash64StringIntIndex, u64, "64", MinHash64V1, FnvBuildHasher);
-py_minhash_index!(MinHash32StringIntIndex, u32, "32", MinHash32V1, FnvBuildHasher);
-py_minhash_index!(MinHash16StringIntIndex, u16, "16", MinHash16V1, FnvBuildHasher);
+py_minhash_index!(MinHash64StringIntIndex, u64, "64", MinHasher64V1, FnvBuildHasher);
+py_minhash_index!(MinHash32StringIntIndex, u32, "32", MinHasher32V1, FnvBuildHasher);
+py_minhash_index!(MinHash16StringIntIndex, u16, "16", MinHasher16V1, FnvBuildHasher);
 
 
 pub fn init_minhash_module(m: &PyModule) -> PyResult<()> {

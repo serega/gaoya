@@ -731,8 +731,8 @@ impl<T, Id> QueryIndex for MinHashIndex<T, Id>
 
 #[cfg(test)]
 mod tests {
-    use crate::minhash::min_hash64::MinHash64V1;
-    use crate::minhash::{calculate_b_and_r, calculate_minhash_params, MinHash, MinHashIndex};
+    use crate::minhash::min_hash64::MinHasher64V1;
+    use crate::minhash::{calculate_b_and_r, calculate_minhash_params, MinHasher, MinHashIndex};
     use rand::distributions::{Distribution, Uniform};
     use rand::prelude::ThreadRng;
     use rand::{thread_rng, Rng};
@@ -748,7 +748,7 @@ mod tests {
     #[test]
     pub fn test_lsh_index() {
         let (b, r) = calculate_minhash_params(0.5, 200);
-        let min_hash = MinHash64V1::new(b * r);
+        let min_hash = MinHasher64V1::new(b * r);
         let mut lsh_index = MinHashIndex::new_with_params(b, r, 0.5);
         lsh_index.insert(1, min_hash.create_signature(S1.split_whitespace()));
         lsh_index.insert(2, min_hash.create_signature(S2.split_whitespace()));
@@ -833,7 +833,7 @@ mod tests {
     #[test]
     pub fn test_lsh_index_batch_construction() {
         let (b, r) = calculate_minhash_params(0.5, 200);
-        let min_hash = MinHash64V1::new(b * r);
+        let min_hash = MinHasher64V1::new(b * r);
         let mut lsh_index: MinHashIndex<u64, u64> = MinHashIndex::new_with_params(b, r, 0.5);
         let mut signatures: Vec<(u64, Vec<u64>)> = Vec::new();
         signatures.push((1, min_hash.create_signature(S1.split_whitespace())));
@@ -882,7 +882,7 @@ mod tests {
     #[test]
     pub fn test_lsh_index_batch_construction2() {
         let (b, r) = calculate_minhash_params(0.5, 128);
-        let min_hash = MinHash64V1::new(128);
+        let min_hash = MinHasher64V1::new(128);
         let mut lsh_index: MinHashIndex<u64, u64> = MinHashIndex::new_with_params(b, r, 0.5);
 
         let mut vecs = Vec::new();

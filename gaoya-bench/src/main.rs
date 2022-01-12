@@ -12,7 +12,7 @@ use std::time::Instant;
 use fxhash::FxBuildHasher;
 use gaoya::clustering::clusterer_parallel::{Clusterer, ClusterPoint, ClusterPointInner};
 
-use gaoya::minhash::{MinHash32V2, MinHash16V1, MinHashIndex, MinHash32V1, MinHash64V1, MinHash, SipHasher24BuildHasher, calculate_minhash_params};
+use gaoya::minhash::{MinHasher32V2, MinHasher16V1, MinHashIndex, MinHasher32V1, MinHasher64V1, MinHasher, SipHasher24BuildHasher, calculate_minhash_params};
 use rayon::prelude::*;
 
 use itertools::Itertools;
@@ -21,9 +21,9 @@ use crate::generate_clusters::*;
 use crate::metrics::Metrics;
 
 
-fn run_clustering<M: MinHash>(generated_clusters: &Vec<GeneratedCluster>,
-                              minhash: M,
-                              num_bands: usize, band_width: usize, jaccard_threshold: f64)
+fn run_clustering<M: MinHasher>(generated_clusters: &Vec<GeneratedCluster>,
+                                minhash: M,
+                                num_bands: usize, band_width: usize, jaccard_threshold: f64)
     where M::V: Clone, M: Sync + Send {
     println!("Creating index {}", std::any::type_name::<M>());
     let mut lsh = MinHashIndex::new_with_params(num_bands, band_width, jaccard_threshold);
@@ -92,7 +92,7 @@ fn main() {
     println!("{:?}", params);
 
     //run_clustering(&generated_clusters, MinHash16V1::new(params.0 * params.1), params.0, params.1, 0.6);
-    run_clustering(&generated_clusters, MinHash32V1::new(params.0 * params.1), params.0, params.1, 0.6);
+    run_clustering(&generated_clusters, MinHasher32V1::new(params.0 * params.1), params.0, params.1, 0.6);
     //run_clustering(&generated_clusters, MinHash64V1::new(params.0 * params.1), params.0, params.1, 0.6);
 
 

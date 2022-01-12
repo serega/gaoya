@@ -8,11 +8,11 @@ mod string_index;
 
 pub use self::hashers::SipHasher24BuildHasher;
 pub use self::hashers::Sha1Hasher;
-pub use self::min_hash16::MinHash16V1;
+pub use self::min_hash16::MinHasher16V1;
 pub use self::min_hash32::{
-    MinHash32V1, MinHash32V2, SuperMinHash32V1, SuperMinHash32V2,
+    MinHasher32V1, MinHasher32V2, SuperMinHasher32V1, SuperMinHash32V2,
 };
-pub use self::min_hash64::MinHash64V1;
+pub use self::min_hash64::MinHasher64V1;
 pub use self::minhash_index::MinHashIndex;
 pub use self::string_index::MinHashStringIndex;
 use std::collections::{HashMap, HashSet};
@@ -22,7 +22,7 @@ use fxhash::FxBuildHasher;
 use rayon::prelude::*;
 
 
-pub trait MinHash {
+pub trait MinHasher {
     /// The data type of individual hash.
     /// This should be one of u-numeric types such as u64, u32, u16, u8
     type V: Hash + Eq + Sync + Send;
