@@ -449,6 +449,31 @@ where
         match_ids
     }
 
+    pub fn query_owned_return_similarity(&self, query_signature: &Vec<T>) -> Vec<(Id, f64)>
+        where
+            Id: Hash + Eq + Clone,
+    {
+        let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
+        for band in &self.bands {
+            band.query_to_owned(query_signature, &mut match_ids);
+        }
+        if self.removed_ids.len() > 0 {
+            match_ids.retain(|item| !self.removed_ids.contains(item));
+        }
+        let mut result = Vec::new();
+        for id in match_ids.into_iter() {
+            let signature = &self.id_signatures[&id];
+            let similarity = compute_minhash_similarity(signature, query_signature);
+            if similarity >= self.threshold {
+                result.push((id, similarity))
+            }
+        }
+        result.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+        result
+    }
+
+
     pub fn query_top_k(&self, query_signature: &Vec<T>, k: usize) -> Vec<(Id, f64)> {
         let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
         for band in &self.bands {

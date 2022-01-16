@@ -34,11 +34,17 @@ pub enum TokenizerSpecification {
 impl TokenizerSpecification {
     pub fn new(name: &str, range: Option<(usize, usize)>) -> Self {
         if name == "char" {
-            let range = range.unwrap();
-            if range.0 == range.1 {
-                return CharShingle((range.0, None));
-            } else {
-                return CharShingle((range.0, Some(range.1)));
+            match range {
+                Some(range) => {
+                    if range.0 == range.1 {
+                        return CharShingle((range.0, None));
+                    } else {
+                        return CharShingle((range.0, Some(range.1)));
+                    }
+                }
+                None => {
+                    return CharShingle((3, Some(4)))
+                }
             }
         } else {
             return WhiteSpace();

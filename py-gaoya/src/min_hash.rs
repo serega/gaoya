@@ -22,6 +22,7 @@ macro_rules! py_minhash_index {
             pub inner: gaoya::minhash::MinHashIndex<$type, i64>,
             pub min_hash: $minhash<$hasher>,
             pub tokenizer: TokenizerSpecification,
+            pub lowercase: bool,
         }
         #[pymethods]
         impl $name {
@@ -32,6 +33,7 @@ macro_rules! py_minhash_index {
                 band_width = "3",
                 num_hashes = "126",
                 analyzer = "\"word\"",
+                lowercase = "false",
                 ngram_range = "(1,1)"
             )]
             pub fn new(
@@ -39,20 +41,16 @@ macro_rules! py_minhash_index {
                 num_bands: Option<usize>,
                 band_width: Option<usize>,
                 num_hashes: Option<usize>,
-                analyzer: &str,
-                ngram_range: (usize, usize),
+                analyzer: Option<&str>,
+                lowercase: Option<bool>,
+                ngram_range: Option<(usize, usize)>,
             ) -> PyResult<Self> {
-                let option_range = if ngram_range.0 == 1 && ngram_range.1 == 1 {
-                    None
-                } else {
-                    Some(ngram_range)
-                };
-
                 if let (Some(num_bands), Some(band_width)) = (num_bands, band_width) {
                     let index = $name {
                         inner: gaoya::minhash::MinHashIndex::new_with_params(num_bands, band_width, jaccard_threshold),
                         min_hash: $minhash::new(num_bands * band_width),
-                        tokenizer: TokenizerSpecification::new(analyzer, option_range),
+                        tokenizer: TokenizerSpecification::new(analyzer.unwrap_or("word"), ngram_range),
+                        lowercase: lowercase.unwrap_or(false),
                     };
                     return Ok(index);
                 }
@@ -61,7 +59,8 @@ macro_rules! py_minhash_index {
                     let index = $name {
                         inner: gaoya::minhash::MinHashIndex::new_with_params(num_bands, band_width, jaccard_threshold),
                         min_hash: $minhash::new(num_bands * band_width),
-                        tokenizer: TokenizerSpecification::new(analyzer, option_range),
+                        tokenizer: TokenizerSpecification::new(analyzer.unwrap_or("word"), ngram_range),
+                        lowercase: lowercase.unwrap_or(false),
                     };
                     return Ok(index);
                 }
@@ -82,9 +81,15 @@ macro_rules! py_minhash_index {
                 }
             }
 
-            pub fn insert_document(&mut self, id: i64, doc: String) {
-                self.inner
-                    .insert(id, self.tokenize_and_minhash(doc.as_str()))
+            pub fn insert_document(&mut self, id: i64, doc: &str) {
+                if self.lowercase {
+                    let doc = doc.to_lowercase();
+                    self.inner
+                        .insert(id, self.tokenize_and_minhash(doc.as_str()))
+                } else {
+                    self.inner
+                        .insert(id, self.tokenize_and_minhash(doc))
+                }
             }
 
             pub fn insert_tokens(&mut self, id: i64, tokens: Vec<&str>) {
@@ -93,11 +98,24 @@ macro_rules! py_minhash_index {
             }
 
             pub fn par_bulk_insert_docs(&mut self, ids: Vec<i64>, docs: Vec<&str>) {
-                let hashes: Vec<_> = docs
-                    .par_iter()
-                    .map(|doc| self.tokenize_and_minhash(doc))
-                    .collect();
-                self.inner.par_bulk_insert(ids, hashes);
+                if ids.len() < 100 { // TODO: find a reasonable threshold
+                    for (id, doc) in ids.iter().zip(docs.iter()) {
+                        self.insert_document(*id, doc)
+                    }
+                } else {
+                    let hashes: Vec<_> = docs
+                        .par_iter()
+                        .map(|doc| {
+                            if self.lowercase {
+                                let doc = doc.to_lowercase();
+                                self.tokenize_and_minhash(doc.as_str())
+                            } else {
+                                self.tokenize_and_minhash(doc)
+                            }
+                         })
+                        .collect();
+                    self.inner.par_bulk_insert(ids, hashes);
+                }
             }
 
             pub fn bulk_insert_tokens(&mut self, ids: Vec<i64>, tokens: Vec<Vec<&str>>) {
@@ -119,12 +137,30 @@ macro_rules! py_minhash_index {
                 self.inner.query_owned(signature).into_iter().collect()
             }
 
-            pub fn query(&self, doc: String) -> Vec<i64> {
+            pub fn query(&self, doc: &str) -> Vec<i64> {
+                let signature = if self.lowercase {
+                    let doc = doc.to_lowercase();
+                    self.tokenize_and_minhash(doc.as_str())
+                } else {
+                    self.tokenize_and_minhash(doc)
+                };
                 self.inner
-                    .query_owned(&self.tokenize_and_minhash(doc.as_str()))
+                    .query_owned(&signature)
                     .into_iter()
                     .collect()
             }
+
+            pub fn query_return_similarity(&self, doc: &str) -> Vec<(i64, f64)> {
+                let signature = if self.lowercase {
+                    let doc = doc.to_lowercase();
+                    self.tokenize_and_minhash(doc.as_str())
+                } else {
+                    self.tokenize_and_minhash(doc)
+                };
+                self.inner
+                    .query_owned_return_similarity(&signature)
+            }
+
 
             pub fn size(&self) -> usize {
                 self.inner.size()

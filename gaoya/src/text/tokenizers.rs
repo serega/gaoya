@@ -8,6 +8,8 @@ pub fn whitespace_split<'a>(text: &'a str) -> impl Iterator<Item = &'a str> {
         .filter(|&x| !x.is_empty())
 }
 
+
+
 pub fn whitespace_split_boxed<'a>(text: &'a str) -> Box<dyn Iterator<Item = &'a str> + 'a> {
     Box::new(text
         .split(|c: char| c.is_ascii_punctuation() || c.is_ascii_whitespace())
