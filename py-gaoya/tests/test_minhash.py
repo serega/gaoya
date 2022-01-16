@@ -82,7 +82,7 @@ def test_return_similarity():
 
     def check_jaccard(doc1, doc2,  value):
         true_jaccard = _jaccard(set(doc1.split(" ")), set(doc2.split(" ")))
-        assert abs(true_jaccard - value) < 0.07
+        assert abs(true_jaccard - value) < 0.1
 
     index.par_bulk_insert_docs(list(range(0, len(corpus))), corpus)
     assert index.size() == 8
