@@ -1,5 +1,6 @@
-use rand::{thread_rng, Rng, SeedableRng};
-use rand_pcg::Pcg32;
+use rand::{Rng, SeedableRng};
+//use rand_pcg::Pcg32;
+use rand::rngs::StdRng;
 use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher};
 
 use crate::minhash::{compute_minhash_similarity, MinHasher};
@@ -31,7 +32,11 @@ impl MinHasher32V1<FnvBuildHasher> {
 
 impl<B: BuildHasher> MinHasher32V1<B> {
     pub fn new_with_hasher(num_hashes: usize, build_hasher: B) -> Self {
-        let mut rng = thread_rng();
+        Self::new_with_hasher_and_seed(num_hashes, build_hasher, 3)
+    }
+
+    pub fn new_with_hasher_and_seed(num_hashes: usize, build_hasher: B, seed: u64) -> Self {
+        let mut rng = StdRng::seed_from_u64(seed);
         let rand_range1 = Uniform::from(1..MERSENNE_PRIME_31);
         let rand_range2 = Uniform::from(0..MERSENNE_PRIME_31);
         MinHasher32V1 {
@@ -45,6 +50,7 @@ impl<B: BuildHasher> MinHasher32V1<B> {
             num_hashes,
         }
     }
+
 
 
     pub fn num_hashes(&self) -> usize {
@@ -106,7 +112,11 @@ impl MinHasher32V2<FnvBuildHasher> {
 impl<B: BuildHasher> MinHasher32V2<B> {
 
     pub fn new_with_hasher(num_hashes: usize, build_hasher: B) -> Self {
-        let mut rng = thread_rng();
+        Self::new_with_hasher_and_seed(num_hashes, build_hasher, 3)
+    }
+
+    pub fn new_with_hasher_and_seed(num_hashes: usize, build_hasher: B, seed: u64) -> Self {
+        let mut rng = StdRng::seed_from_u64(seed);
         let rand_range1 = Uniform::from(1..u32::MAX as u64);
         let rand_range2 = Uniform::from(0..u32::MAX as u64);
         MinHasher32V2 {
@@ -198,7 +208,7 @@ impl<B: BuildHasher> MinHasher for SuperMinHasher32V1<B> {
             let mut hasher = self.build_hasher.build_hasher();
             item.hash(&mut hasher);
             let h = hasher.finish();
-            let mut rng = Pcg32::seed_from_u64(h);
+            let mut rng = StdRng::seed_from_u64(h);
             let mut p: Vec<u32> = (0..(self.num_hashes) as u32).collect();
             p.shuffle(&mut rng);
             let rand_range = Uniform::from(0f32..1.0f32);
@@ -253,7 +263,7 @@ impl<B: BuildHasher> MinHasher for SuperMinHash32V2<B> {
         for item in iter.enumerate() {
             let mut hasher = self.build_hasher.build_hasher();
             item.1.hash(&mut hasher);
-            let mut rng = Pcg32::seed_from_u64(hasher.finish());
+            let mut rng = StdRng::seed_from_u64(hasher.finish());
             let mut j: usize = 0;
             let i = item.0;
             while j <= a {

@@ -1,13 +1,12 @@
 use pyo3::prelude::*;
-use pyo3::{PyClass, PyObjectProtocol, PyTypeInfo};
+use pyo3::{PyObjectProtocol};
 
 
 use crate::TokenizerSpecification;
 use fnv::FnvBuildHasher;
-use gaoya::minhash::{compute_jaccard_similarity, calculate_minhash_params,
-                     MinHasher, MinHasher16V1, MinHasher32V1, MinHasher32V2, MinHasher64V1};
+use gaoya::minhash::{calculate_minhash_params,
+                     MinHasher, MinHasher16V1, MinHasher32V1, MinHasher64V1};
 use gaoya::text::{shingle_text, shingle_text_range, whitespace_split};
-use pyo3::class::impl_::PyClassImpl;
 use pyo3::exceptions::PyValueError;
 use rayon::prelude::*;
 

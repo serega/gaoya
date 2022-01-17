@@ -1,5 +1,4 @@
 use pyo3::prelude::*;
-use pyo3::PyObjectProtocol;
 extern crate gaoya;
 use self::gaoya::simhash::SimSipHasher128;
 use gaoya::simhash::{SimHash, SimHashIndex, SimSipHasher64};

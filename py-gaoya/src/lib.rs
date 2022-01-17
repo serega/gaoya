@@ -1,16 +1,10 @@
 use pyo3::prelude::*;
-use gaoya::text::{whitespace_split_boxed, whitespace_split};
-use gaoya::text::shingle_text_boxed;
-use gaoya::text::shingle_text;
 
 mod min_hash;
 mod sim_hash;
 
 use min_hash::init_minhash_module;
 use sim_hash::init_simhash_module;
-use std::hash::Hash;
-use std::iter::Map;
-use shingles::Shingles;
 use crate::TokenizerSpecification::{CharShingle, WhiteSpace};
 
 #[pymodule]
