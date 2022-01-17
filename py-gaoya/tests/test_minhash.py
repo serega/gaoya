@@ -68,7 +68,7 @@ def test_documents():
 
 def test_return_similarity():
     def _jaccard(s1: Set, s2: Set): return len(s1 & s2) / len(s1 | s2)
-    index = MinHashStringIntIndex(32, 0.5, 42, 3, None, 'word', False, (1,1))
+    index = MinHashStringIntIndex(32, 0.5, 45, 3, None, 'word', False, (1,1))
     corpus = [
         "a b c d e f g h k l m n o p q",
         "a b c d e f g h k l m n o p",
