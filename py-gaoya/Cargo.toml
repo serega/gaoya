@@ -1,10 +1,12 @@
 [package]
 name = "pygaoya"
 version = "0.1.0"
-authors = ["Sergejs Melderis <sergejs.melderis@sinch.com>"]
+authors = ["Sergey Melderis <sergey.melderis@gmail.com>"]
 edition = "2021"
-
-
+license = "MIT"
+homepage = "https://github.com/serega/gaoya"
+repository = "https://github.com/serega/gaoya"
+description = "Locality Sensitive Hashing"
 
 [lib]
 name = "gaoya"
@@ -18,7 +20,6 @@ disable-publish = true
 name = "gaoya"
 classifier = [
     "Programming Language :: Rust",
-    "Operating System :: POSIX :: Linux",
 ]
 
 [dependencies]
@@ -52,7 +53,7 @@ lto = "fat"
 
 # Includes debug information in release builds. Necessary for profiling. Does not
 # slow down the executable.
-debug = true
+# debug = true
 
 # The default optimization level is 3 for release mode builds.
 # 0 means disable optimization and is the default for debug mode buids.
