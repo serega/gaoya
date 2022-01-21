@@ -1,7 +1,9 @@
 name: Create macOs universal2 python release
 
-on: [push, pull_request]
-
+on:
+  push:
+    tags:
+      - '*'
 jobs:
   build:
     name: Create Release
