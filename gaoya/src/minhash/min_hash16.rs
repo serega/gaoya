@@ -74,15 +74,17 @@ impl<B: BuildHasher> MinHasher for MinHasher16V1<B> {
                     hashes.iter()
                         .map(|hash| {
                             (hash.wrapping_mul(*ab.0).wrapping_add(*ab.1) % MERSENNE_PRIME_31)
-                                as u16
+
                         })
-                        .min().unwrap()
+                        .min().unwrap() as u16
                 })
                 .collect(),
             _ => vec![0; self.num_hashes],
         }
     }
 }
+
+
 
 #[cfg(test)]
 mod tests {
