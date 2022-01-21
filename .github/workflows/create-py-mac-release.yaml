@@ -32,7 +32,7 @@ jobs:
       - name: maturin publish
         uses: messense/maturin-action@v1
         env:
-          MATURIN_PASSWORD: ${{ secrets.PYPI_PASS }}
+          MATURIN_PASSWORD: ${{ secrets.TEST_PYPI_PASS }}
         with:
           maturin-version: 0.12.6
           command: publish
