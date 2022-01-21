@@ -11,7 +11,7 @@ use std::hash::{BuildHasher, Hash};
 use std::marker::PhantomData;
 use std::ops::BitOrAssign;
 
-pub struct SimHashTable<S, Id>
+struct SimHashTable<S, Id>
 where
     Id: Hash + Eq + Clone,
     S: SimHashBits,
@@ -73,6 +73,7 @@ where
 }
 unsafe impl<S: SimHashBits, Id: Hash + Eq + Clone> Send for SimHashTable<S, Id> {}
 unsafe impl<S: SimHashBits, Id: Hash + Eq + Clone> Sync for SimHashTable<S, Id> {}
+
 
 pub struct SimHashIndex<S, Id>
 where
