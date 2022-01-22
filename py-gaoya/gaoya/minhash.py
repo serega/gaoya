@@ -88,7 +88,6 @@ class MinHashStringIntIndex:
         if jaccard_threshold < 0.0 or jaccard_threshold > 1.0:
             raise ValueError(f"Jaccard threshold must be between 0 and 1")
         self.analyzer = analyzer
-        analyzer = 'word'
         if hash_size == 64:
             self.index = m.MinHash64StringIntIndex(jaccard_threshold, num_bands, band_size, num_hashes, analyzer, lowercase, ngram_range)
         elif hash_size == 32:
