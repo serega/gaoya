@@ -6,7 +6,8 @@ use crate::TokenizerSpecification;
 use fnv::FnvBuildHasher;
 use gaoya::minhash::{calculate_minhash_params,
                      MinHasher, MinHasher16V1, MinHasher32V1, MinHasher64V1};
-use gaoya::text::{shingle_text, shingle_text_range, whitespace_split};
+use gaoya::text::{shingle_text, shingle_tokens, shingle_text_range, whitespace_split, MultiShingles};
+use shingles::Shingles;
 use pyo3::exceptions::PyValueError;
 use rayon::prelude::*;
 
@@ -68,14 +69,24 @@ macro_rules! py_minhash_index {
 
             pub fn tokenize_and_minhash(&self, doc: &str) -> Vec<$type> {
                 match &self.tokenizer {
-                    TokenizerSpecification::CharShingle((from, Some(to))) => self
-                        .min_hash
-                        .create_signature(shingle_text_range(doc, *from, *to)),
                     TokenizerSpecification::CharShingle((from, None)) => {
                         self.min_hash.create_signature(shingle_text(doc, *from))
                     }
+                    TokenizerSpecification::CharShingle((from, Some(to))) => self
+                        .min_hash
+                        .create_signature(shingle_text_range(doc, *from, *to)),
                     TokenizerSpecification::WhiteSpace() => {
                         self.min_hash.create_signature(whitespace_split(doc))
+                    }
+                    TokenizerSpecification::WhiteSpaceShingle((from, None)) => {
+                        let words: Vec<_> = whitespace_split(doc).collect();
+                        let shingles = Shingles::new(words.as_slice(), *from);
+                        self.min_hash.create_signature(shingles)
+                    }
+                    TokenizerSpecification::WhiteSpaceShingle((from, Some(to))) => {
+                        let words: Vec<_> = whitespace_split(doc).collect();
+                        let shingles = MultiShingles::new(words.as_slice(), *from, *to);
+                        self.min_hash.create_signature(shingles)
                     }
                 }
             }
@@ -169,11 +180,11 @@ macro_rules! py_minhash_index {
         #[pyproto]
         impl PyObjectProtocol for $name {
             fn __str__(&self) -> PyResult<String> {
-                Ok(format!("{}", self.inner))
+                Ok(format!("{} {:?}", self.inner, self.tokenizer))
             }
 
             fn __repr__(&self) -> PyResult<String> {
-                Ok(format!("{}", self.inner))
+                Ok(format!("{} {:?}", self.inner, self.tokenizer))
             }
         }
 
