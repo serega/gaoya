@@ -75,6 +75,7 @@ unsafe impl<S: SimHashBits, Id: Hash + Eq + Clone> Send for SimHashTable<S, Id> 
 unsafe impl<S: SimHashBits, Id: Hash + Eq + Clone> Sync for SimHashTable<S, Id> {}
 
 
+
 pub struct SimHashIndex<S, Id>
 where
     S: SimHashBits,
@@ -93,11 +94,10 @@ where
     S: SimHashBits,
     Id: Hash + Eq + Clone,
 {
+
     pub fn new(num_blocks: usize, hamming_distance: usize) -> Self {
         let permutations = Permutation::<S>::create(num_blocks, hamming_distance);
         let max_width: usize = permutations.iter().map(|p| p.width).max().unwrap();
-        //println!("{}", max_width);
-        //println!("num perms {}", permutations.len());
         SimHashIndex {
             num_blocks: num_blocks,
             hamming_distance: hamming_distance,
@@ -149,10 +149,10 @@ where
             }
         });
 
-        // for id_hash in id_signature_pairs {
-        //     self.id_signatures.insert(id_hash.0, id_hash.1);
-        // }
-        // self.id_signatures.shrink_to_fit();
+        for id_hash in id_signature_pairs {
+            self.id_signatures.insert(id_hash.0, id_hash.1);
+        }
+        self.id_signatures.shrink_to_fit();
     }
 
     pub fn query(&self, query_signature: &S) -> HashSet<&Id, FxBuildHasher> {

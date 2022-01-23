@@ -136,12 +136,45 @@ class MinHashStringIntIndex:
         List of ids or list of tuples
         """
         if callable(self.analyzer):
-            return self.index.query_tokens(self.analyzer(doc))
+            if return_similarity:
+                return self.index.query_tokens(self.analyzer(doc))
+            else:
+                return self.index.query_tokens_return_similarity(self.analyzer(doc))
         else:
             if return_similarity:
                 return self.index.query_return_similarity(doc)
             else:
                 return self.index.query(doc)
+
+    def bulk_query(self, docs: List[str], return_similarity=False):
+        """
+        Searches the index for documents similar to ``docs``.
+        This method uses multiple native threads to execute ``query`` operation on a batch of documents
+        Returns list of lists of similar document ids or list of lists of tuples
+        Parameters
+        ----------
+        doc: list
+            List of strings
+        return_similarity: Bool, default=False
+            Whether to return jaccard similarity values
+
+        Returns:
+        ----------
+        List Lists of ids or list of lists of tuples
+        """
+
+        if callable(self.analyzer):
+            analyzed_docs = [self.analyzer(doc) for doc in docs]
+            if return_similarity:
+                return self.index.par_bulk_query_tokens_return_similarity(analyzed_docs)
+            else:
+                return self.index.par_bulk_query_tokens(analyzed_docs)
+        else:
+            if return_similarity:
+                return self.index.par_bulk_query_return_similarity(docs)
+            else:
+                return self.index.par_bulk_query(docs)
+
 
 
     def par_bulk_insert_docs(self, ids: List[int], docs: List[str]):
@@ -154,7 +187,6 @@ class MinHashStringIntIndex:
 
         docs: list
             List of strings
-        :return:
         """
         if callable(self.analyzer):
             tokens = [self.analyzer(doc) for doc in docs]

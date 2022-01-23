@@ -449,6 +449,27 @@ where
         match_ids
     }
 
+    pub fn par_bulk_query(&self, signatures: &Vec<Vec<T>>) -> Vec<HashSet<Id, FxBuildHasher>>
+        where
+            Id: Hash + Eq + Clone + Send + Sync,
+            T: Send + Sync
+    {
+        signatures.par_iter()
+            .map(|signature| self.query_owned(signature))
+            .collect()
+    }
+
+    pub fn par_bulk_query_return_similarity(&self, signatures: &Vec<Vec<T>>) -> Vec<Vec<(Id, f64)>>
+        where
+            Id: Hash + Eq + Clone + Send + Sync,
+            T: Send + Sync
+    {
+        signatures.par_iter()
+            .map(|signature| self.query_owned_return_similarity(signature))
+            .collect()
+    }
+
+
     pub fn query_owned_return_similarity(&self, query_signature: &Vec<T>) -> Vec<(Id, f64)>
         where
             Id: Hash + Eq + Clone,

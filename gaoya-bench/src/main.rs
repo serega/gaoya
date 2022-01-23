@@ -12,7 +12,7 @@ use std::time::Instant;
 use fxhash::FxBuildHasher;
 use gaoya::clustering::clusterer_parallel::{Clusterer, ClusterPoint, ClusterPointInner};
 
-use gaoya::minhash::{MinHasher32V2, MinHasher16V1, MinHashIndex, MinHasher32V1, MinHasher64V1, MinHasher, SipHasher24BuildHasher, calculate_minhash_params, MinHasher16V2};
+use gaoya::minhash::{MinHasher32V2, MinHasher16V1, MinHashIndex, MinHasher32V1, MinHasher64V1, MinHasher, SipHasher24BuildHasher, calculate_minhash_params};
 use rayon::prelude::*;
 
 use itertools::Itertools;
@@ -90,7 +90,6 @@ fn main() {
     println!("{:?}", params);
 
     run_clustering(&generated_clusters, MinHasher16V1::new(params.0 * params.1), params.0, params.1, 0.6);
-    run_clustering(&generated_clusters, MinHasher16V2::new(params.0 * params.1), params.0, params.1, 0.6);
     //run_clustering(&generated_clusters, MinHasher32V1::new(params.0 * params.1), params.0, params.1, 0.6);
     //run_clustering(&generated_clusters, MinHash64V1::new(params.0 * params.1), params.0, params.1, 0.6);
 
