@@ -137,9 +137,9 @@ class MinHashStringIntIndex:
         """
         if callable(self.analyzer):
             if return_similarity:
-                return self.index.query_tokens(self.analyzer(doc))
-            else:
                 return self.index.query_tokens_return_similarity(self.analyzer(doc))
+            else:
+                return self.index.query_tokens(self.analyzer(doc))
         else:
             if return_similarity:
                 return self.index.query_return_similarity(doc)
