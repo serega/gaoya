@@ -63,6 +63,7 @@ where
         }
     }
 
+
     fn avg_bucket_count(&self) -> Option<usize> {
         let sum = self.table.values().map(|v| v.len()).sum::<usize>();
         match self.table.len() {
@@ -161,6 +162,15 @@ where
             table.query(query_signature, &mut match_ids, self.hamming_distance);
         }
         match_ids
+    }
+
+    pub fn query_return_distance(&self, query_signature: &S) -> Vec<(Id, usize)> {
+        let ids = self.query(query_signature);
+        let mut result: Vec<_> = ids.into_iter()
+            .map(|id| (id.clone(), query_signature.hamming_distance(&self.id_signatures[id])))
+            .collect();
+        result.sort_unstable_by(|a, b| a.1.cmp(&b.1));
+        result
     }
 
     pub fn size(&self) -> usize {

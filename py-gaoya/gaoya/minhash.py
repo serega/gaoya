@@ -2,9 +2,9 @@ from typing import List, Union, Tuple
 
 from .gaoya import minhash as m
 
-class MinHashStringIntIndex:
+class MinHashStringIndex:
     """
-    MinHashStringIntIndex.
+    MinHashStringIndex.
 
     Reference: `Chapter 3, Mining of Massive Datasets
     <http://www.mmds.org/>`_.
@@ -56,7 +56,7 @@ class MinHashStringIntIndex:
 
         Examples
         --------
-        >>> index = gaoya.MinHashStringIntIndex(32, 0.5, 42, 3, None, 'word', True, (1,1))
+        >>> index = gaoya.minhash.MinHashStringIndex(32, 0.5, 42, 3, None, 'word', True, (1,1))
         >>> corpus = [
         ...     'This is the first document.',
         ...     'This document is the second document.',
