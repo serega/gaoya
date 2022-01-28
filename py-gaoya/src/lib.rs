@@ -5,7 +5,7 @@ mod sim_hash;
 
 use min_hash::init_minhash_module;
 use sim_hash::init_simhash_module;
-use crate::TokenizerSpecification::{CharShingle, WhiteSpace};
+use crate::TokenizerSpecification::{CharShingle, WhiteSpace, WhiteSpaceShingle};
 
 #[pymodule]
 fn gaoya(py: Python, module: &PyModule) -> PyResult<()> {
@@ -19,10 +19,11 @@ fn gaoya(py: Python, module: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
-
+#[derive(Debug)]
 pub enum TokenizerSpecification {
     CharShingle((usize, Option<usize>)),
     WhiteSpace(),
+    WhiteSpaceShingle((usize, Option<usize>)),
 }
 
 impl TokenizerSpecification {
@@ -41,7 +42,19 @@ impl TokenizerSpecification {
                 }
             }
         } else {
-            return WhiteSpace();
+            match range {
+                Some(range) => {
+                    if range.0 == range.1 {
+                        return WhiteSpaceShingle((range.0, None));
+                    } else {
+                        return WhiteSpaceShingle((range.0, Some(range.1)));
+                    }
+                }
+                None => {
+                    return WhiteSpace();
+                }
+            }
+
         }
     }
 }

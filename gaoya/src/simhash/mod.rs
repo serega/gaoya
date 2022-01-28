@@ -5,7 +5,6 @@ mod sim_hasher;
 
 pub use self::sim_hash::SimHash;
 pub use self::sim_hash_index::SimHashIndex;
-pub use self::sim_hash_index::SimHashTable;
 pub use self::sim_hasher::SimSipHasher128;
 pub use self::sim_hasher::SimSipHasher64;
 

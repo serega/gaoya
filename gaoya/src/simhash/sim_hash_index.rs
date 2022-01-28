@@ -11,7 +11,7 @@ use std::hash::{BuildHasher, Hash};
 use std::marker::PhantomData;
 use std::ops::BitOrAssign;
 
-pub struct SimHashTable<S, Id>
+struct SimHashTable<S, Id>
 where
     Id: Hash + Eq + Clone,
     S: SimHashBits,
@@ -63,6 +63,7 @@ where
         }
     }
 
+
     fn avg_bucket_count(&self) -> Option<usize> {
         let sum = self.table.values().map(|v| v.len()).sum::<usize>();
         match self.table.len() {
@@ -73,6 +74,8 @@ where
 }
 unsafe impl<S: SimHashBits, Id: Hash + Eq + Clone> Send for SimHashTable<S, Id> {}
 unsafe impl<S: SimHashBits, Id: Hash + Eq + Clone> Sync for SimHashTable<S, Id> {}
+
+
 
 pub struct SimHashIndex<S, Id>
 where
@@ -92,11 +95,10 @@ where
     S: SimHashBits,
     Id: Hash + Eq + Clone,
 {
+
     pub fn new(num_blocks: usize, hamming_distance: usize) -> Self {
         let permutations = Permutation::<S>::create(num_blocks, hamming_distance);
         let max_width: usize = permutations.iter().map(|p| p.width).max().unwrap();
-        //println!("{}", max_width);
-        //println!("num perms {}", permutations.len());
         SimHashIndex {
             num_blocks: num_blocks,
             hamming_distance: hamming_distance,
@@ -148,10 +150,10 @@ where
             }
         });
 
-        // for id_hash in id_signature_pairs {
-        //     self.id_signatures.insert(id_hash.0, id_hash.1);
-        // }
-        // self.id_signatures.shrink_to_fit();
+        for id_hash in id_signature_pairs {
+            self.id_signatures.insert(id_hash.0, id_hash.1);
+        }
+        self.id_signatures.shrink_to_fit();
     }
 
     pub fn query(&self, query_signature: &S) -> HashSet<&Id, FxBuildHasher> {
@@ -160,6 +162,15 @@ where
             table.query(query_signature, &mut match_ids, self.hamming_distance);
         }
         match_ids
+    }
+
+    pub fn query_return_distance(&self, query_signature: &S) -> Vec<(Id, usize)> {
+        let ids = self.query(query_signature);
+        let mut result: Vec<_> = ids.into_iter()
+            .map(|id| (id.clone(), query_signature.hamming_distance(&self.id_signatures[id])))
+            .collect();
+        result.sort_unstable_by(|a, b| a.1.cmp(&b.1));
+        result
     }
 
     pub fn size(&self) -> usize {

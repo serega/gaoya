@@ -1,10 +1,10 @@
 from typing import Set
 
-from gaoya.minhash import MinHashStringIntIndex
+from gaoya.minhash import MinHashStringIndex
 
 
 def test_minhash_64bit():
-    index = MinHashStringIntIndex(64, jaccard_threshold=0.5, num_bands=20, band_size=5, analyzer="word")
+    index = MinHashStringIndex(64, jaccard_threshold=0.5, num_bands=20, band_size=5, analyzer="word")
     index.insert_document(1, " a b c d e")
 
     assert index.query("a b c d e") == [1]
@@ -14,7 +14,7 @@ def test_minhash_64bit():
 
 
 def test_minhash_32bit():
-    index = MinHashStringIntIndex(32, 0.5, 30, 5)
+    index = MinHashStringIndex(32, 0.5, 30, 5)
     index.insert_document(1, "a b c d e f")
     index.insert_document(2, "1 2 3 4 5 6 8")
 
@@ -29,7 +29,7 @@ def test_minhash_16bit_custom_analyzer():
     def split_and_uppercase(doc):
         return [token.upper() for token in doc.split(" ")]
 
-    index = MinHashStringIntIndex(
+    index = MinHashStringIndex(
         hash_size=16,
         jaccard_threshold=0.5,
         num_bands=40, band_size=5, num_hashes=None,
@@ -38,7 +38,6 @@ def test_minhash_16bit_custom_analyzer():
     index.insert_document(1, "a b c d e f g")
     index.insert_document(2, "foo bar baz")
 
-
     assert index.query("A B C D E F G") == [1]
     assert index.query("a b c d e f g") == [1]
     assert index.query("FOO bar baz") == [2]
@@ -46,7 +45,7 @@ def test_minhash_16bit_custom_analyzer():
 
 
 def test_documents():
-    index = MinHashStringIntIndex(32, 0.5, 42, 3, None, 'word', True, (1,1))
+    index = MinHashStringIndex(32, 0.5, 42, 3, None, 'word', True, (1,1))
     corpus = [
         'This is the first document.',
         'This document is the second document.',
@@ -68,7 +67,7 @@ def test_documents():
 
 def test_return_similarity():
     def _jaccard(s1: Set, s2: Set): return len(s1 & s2) / len(s1 | s2)
-    index = MinHashStringIntIndex(32, 0.5, 45, 3, None, 'word', False, (1,1))
+    index = MinHashStringIndex(32, 0.5, 45, 3, None, 'word', False, (1,1))
     corpus = [
         "a b c d e f g h k l m n o p q",
         "a b c d e f g h k l m n o p",
@@ -112,6 +111,9 @@ def test_return_similarity():
     assert result[2][1] > result[3][1]
     check_jaccard(corpus[7], corpus[result[2][0]], result[2][1])
     check_jaccard(corpus[7], corpus[result[3][0]], result[3][1])
+
+
+
 
 
 

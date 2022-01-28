@@ -6,7 +6,8 @@ use crate::TokenizerSpecification;
 use fnv::FnvBuildHasher;
 use gaoya::minhash::{calculate_minhash_params,
                      MinHasher, MinHasher16V1, MinHasher32V1, MinHasher64V1};
-use gaoya::text::{shingle_text, shingle_text_range, whitespace_split};
+use gaoya::text::{shingle_text, shingle_tokens, shingle_text_range, whitespace_split, MultiShingles};
+use shingles::Shingles;
 use pyo3::exceptions::PyValueError;
 use rayon::prelude::*;
 
@@ -68,14 +69,24 @@ macro_rules! py_minhash_index {
 
             pub fn tokenize_and_minhash(&self, doc: &str) -> Vec<$type> {
                 match &self.tokenizer {
-                    TokenizerSpecification::CharShingle((from, Some(to))) => self
-                        .min_hash
-                        .create_signature(shingle_text_range(doc, *from, *to)),
                     TokenizerSpecification::CharShingle((from, None)) => {
                         self.min_hash.create_signature(shingle_text(doc, *from))
                     }
+                    TokenizerSpecification::CharShingle((from, Some(to))) => self
+                        .min_hash
+                        .create_signature(shingle_text_range(doc, *from, *to)),
                     TokenizerSpecification::WhiteSpace() => {
                         self.min_hash.create_signature(whitespace_split(doc))
+                    }
+                    TokenizerSpecification::WhiteSpaceShingle((from, None)) => {
+                        let words: Vec<_> = whitespace_split(doc).collect();
+                        let shingles = Shingles::new(words.as_slice(), *from);
+                        self.min_hash.create_signature(shingles)
+                    }
+                    TokenizerSpecification::WhiteSpaceShingle((from, Some(to))) => {
+                        let words: Vec<_> = whitespace_split(doc).collect();
+                        let shingles = MultiShingles::new(words.as_slice(), *from, *to);
+                        self.min_hash.create_signature(shingles)
                     }
                 }
             }
@@ -96,24 +107,27 @@ macro_rules! py_minhash_index {
                     .insert(id, self.min_hash.create_signature(tokens.iter()));
             }
 
+            fn bulk_hash_docs(&self, docs: Vec<&str>) -> Vec<Vec<$type>> {
+                docs.par_iter()
+                .map(|doc| {
+                    if self.lowercase {
+                        let doc = doc.to_lowercase();
+                        self.tokenize_and_minhash(doc.as_str())
+                    } else {
+                        self.tokenize_and_minhash(doc)
+                    }
+                })
+                .collect()
+            }
+
             pub fn par_bulk_insert_docs(&mut self, ids: Vec<i64>, docs: Vec<&str>) {
                 if ids.len() < 100 { // TODO: find a reasonable threshold
                     for (id, doc) in ids.iter().zip(docs.iter()) {
                         self.insert_document(*id, doc)
                     }
                 } else {
-                    let hashes: Vec<_> = docs
-                        .par_iter()
-                        .map(|doc| {
-                            if self.lowercase {
-                                let doc = doc.to_lowercase();
-                                self.tokenize_and_minhash(doc.as_str())
-                            } else {
-                                self.tokenize_and_minhash(doc)
-                            }
-                         })
-                        .collect();
-                    self.inner.par_bulk_insert(ids, hashes);
+                    let signatures = self.bulk_hash_docs(docs);
+                    self.inner.par_bulk_insert(ids, signatures);
                 }
             }
 
@@ -136,6 +150,11 @@ macro_rules! py_minhash_index {
                 self.inner.query_owned(signature).into_iter().collect()
             }
 
+            pub fn query_tokens_return_similarity(&self, tokens: Vec<&str>) ->  Vec<(i64, f64)> {
+                let signature = &self.min_hash.create_signature(tokens.iter());
+                self.inner.query_owned_return_similarity(&signature)
+            }
+
             pub fn query(&self, doc: &str) -> Vec<i64> {
                 let signature = if self.lowercase {
                     let doc = doc.to_lowercase();
@@ -156,8 +175,34 @@ macro_rules! py_minhash_index {
                 } else {
                     self.tokenize_and_minhash(doc)
                 };
-                self.inner
-                    .query_owned_return_similarity(&signature)
+                self.inner.query_owned_return_similarity(&signature)
+            }
+
+            pub fn par_bulk_query(&self, docs: Vec<&str>) -> Vec<Vec<i64>> {
+                let signatures = self.bulk_hash_docs(docs);
+                self.inner.par_bulk_query(&signatures)
+                    .into_iter()
+                    .map(|set| set.into_iter().collect())
+                    .collect()
+            }
+
+            pub fn par_bulk_query_return_similarity(&self, docs: Vec<&str>) -> Vec<Vec<(i64, f64)>> {
+                let signatures = self.bulk_hash_docs(docs);
+                self.inner.par_bulk_query_return_similarity(&signatures)
+            }
+
+
+            pub fn par_bulk_query_tokens(&self, tokens: Vec<Vec<&str>>) -> Vec<Vec<i64>> {
+                let signatures = self.min_hash.bulk_create_signature(&tokens);
+                self.inner.par_bulk_query(&signatures)
+                    .into_iter()
+                    .map(|set| set.into_iter().collect())
+                    .collect()
+            }
+
+            pub fn par_bulk_query_tokens_return_similarity(&self, tokens: Vec<Vec<&str>>) -> Vec<Vec<(i64, f64)>> {
+                let signatures = self.min_hash.bulk_create_signature(&tokens);
+                self.inner.par_bulk_query_return_similarity(&signatures)
             }
 
 
@@ -169,11 +214,11 @@ macro_rules! py_minhash_index {
         #[pyproto]
         impl PyObjectProtocol for $name {
             fn __str__(&self) -> PyResult<String> {
-                Ok(format!("{}", self.inner))
+                Ok(format!("{} {:?}", self.inner, self.tokenizer))
             }
 
             fn __repr__(&self) -> PyResult<String> {
-                Ok(format!("{}", self.inner))
+                Ok(format!("{} {:?}", self.inner, self.tokenizer))
             }
         }
 

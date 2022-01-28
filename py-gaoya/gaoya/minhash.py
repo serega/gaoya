@@ -2,9 +2,9 @@ from typing import List, Union, Tuple
 
 from .gaoya import minhash as m
 
-class MinHashStringIntIndex:
+class MinHashStringIndex:
     """
-    MinHashStringIntIndex.
+    MinHashStringIndex.
 
     Reference: `Chapter 3, Mining of Massive Datasets
     <http://www.mmds.org/>`_.
@@ -56,7 +56,7 @@ class MinHashStringIntIndex:
 
         Examples
         --------
-        >>> index = gaoya.MinHashStringIntIndex(32, 0.5, 42, 3, None, 'word', True, (1,1))
+        >>> index = gaoya.minhash.MinHashStringIndex(32, 0.5, 42, 3, None, 'word', True, (1,1))
         >>> corpus = [
         ...     'This is the first document.',
         ...     'This document is the second document.',
@@ -88,7 +88,8 @@ class MinHashStringIntIndex:
         if jaccard_threshold < 0.0 or jaccard_threshold > 1.0:
             raise ValueError(f"Jaccard threshold must be between 0 and 1")
         self.analyzer = analyzer
-        analyzer = 'word'
+        # if analyzer is callable we need to pass something to index's constructor.
+        analyzer = 'word' if callable(self.analyzer) else analyzer
         if hash_size == 64:
             self.index = m.MinHash64StringIntIndex(jaccard_threshold, num_bands, band_size, num_hashes, analyzer, lowercase, ngram_range)
         elif hash_size == 32:
@@ -135,12 +136,45 @@ class MinHashStringIntIndex:
         List of ids or list of tuples
         """
         if callable(self.analyzer):
-            return self.index.query_tokens(self.analyzer(doc))
+            if return_similarity:
+                return self.index.query_tokens_return_similarity(self.analyzer(doc))
+            else:
+                return self.index.query_tokens(self.analyzer(doc))
         else:
             if return_similarity:
                 return self.index.query_return_similarity(doc)
             else:
                 return self.index.query(doc)
+
+    def bulk_query(self, docs: List[str], return_similarity=False):
+        """
+        Searches the index for documents similar to ``docs``.
+        This method uses multiple native threads to execute ``query`` operation on a batch of documents
+        Returns list of lists of similar document ids or list of lists of tuples
+        Parameters
+        ----------
+        doc: list
+            List of strings
+        return_similarity: Bool, default=False
+            Whether to return jaccard similarity values
+
+        Returns:
+        ----------
+        List Lists of ids or list of lists of tuples
+        """
+
+        if callable(self.analyzer):
+            analyzed_docs = [self.analyzer(doc) for doc in docs]
+            if return_similarity:
+                return self.index.par_bulk_query_tokens_return_similarity(analyzed_docs)
+            else:
+                return self.index.par_bulk_query_tokens(analyzed_docs)
+        else:
+            if return_similarity:
+                return self.index.par_bulk_query_return_similarity(docs)
+            else:
+                return self.index.par_bulk_query(docs)
+
 
 
     def par_bulk_insert_docs(self, ids: List[int], docs: List[str]):
@@ -153,7 +187,6 @@ class MinHashStringIntIndex:
 
         docs: list
             List of strings
-        :return:
         """
         if callable(self.analyzer):
             tokens = [self.analyzer(doc) for doc in docs]
@@ -167,3 +200,8 @@ class MinHashStringIntIndex:
         """
         return self.index.size()
 
+    def __str__(self):
+        return self.index.__str__()
+
+    def __repr__(self):
+        return self.index.__repr__()
