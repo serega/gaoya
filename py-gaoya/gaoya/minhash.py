@@ -182,6 +182,8 @@ class MinHashStringIndex:
         Inserts a batch of documents. This method will use multiple cores to insert a batch
         of documents into the index. If analyzer is callable tokenization will be single threaded.
 
+        Parameters
+        ----------
         ids: list
             List of ids
 
@@ -193,6 +195,24 @@ class MinHashStringIndex:
             self.index.bulk_insert_tokens(ids, tokens)
         else:
             self.index.par_bulk_insert_docs(ids, docs)
+
+    def remove(self, id: int):
+        """
+        Removes id from the index.
+
+        Currently, this method may not remove the minhash associated with `id` from memory if there is another minhash
+        with the same value at any band.
+        To fully remove minhash from memory gaoya needs to be compiled on nightly Rust channel with `--features "unstable"`
+        This will work on the stable when this issue is resolved
+        https://github.com/rust-lang/rust/issues/56167
+
+
+        Parameters
+        ----------
+        id: int
+            Id of the document
+        """
+        self.index.remove(id)
 
     def size(self):
         """
