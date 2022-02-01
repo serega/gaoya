@@ -7,10 +7,12 @@ use std::any::type_name;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::hash::{BuildHasher, Hash, Hasher};
 use std::{fmt, slice};
+#[cfg(all(feature = "unstable"))]
+use std::collections::hash_map::RawEntryMut;
+
 use std::fmt::{Display, Formatter};
 use std::ops::Range;
 use itertools::Itertools;
-use sha1::digest::generic_array::typenum::Cmp;
 use crate::clustering::QueryIndex;
 
 
@@ -176,6 +178,9 @@ where
         best_index
     }
 
+    /// Removes id from the band
+    /// Returns true if the band portion of the signature is not in the hashtable
+    #[cfg(not(feature = "unstable"))]
     fn remove(&mut self, id: &Id, signature: &Vec<T>) -> bool {
         let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
         let band_key = BandKey {
@@ -188,11 +193,39 @@ where
                 ids.remove(id);
                 if ids.is_empty() {
                     self.hash_table.remove(&band_key);
-                    return true;
+                    true
+                } else {
+                    false
                 }
-                false
             }
             None => false,
+        }
+    }
+
+    /// Removes id from the band
+    /// Returns true if the band portion of the signature is not in the hashtable
+    /// This method currently only compiles on nightly channel because it relies on
+    /// HashMap::raw_entry_mut() to compare the pointers of bands
+    #[cfg(all(feature = "unstable"))]
+    fn remove(&mut self, id: &Id, signature: &Vec<T>) -> bool {
+        let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
+        let band_key = BandKey {
+            v: band_data,
+            len: (self.band_end - self.band_start) as usize,
+        };
+
+        match self.hash_table.raw_entry_mut().from_key(&band_key) {
+            RawEntryMut::Occupied(mut entry) => {
+                let mut ids = entry.get_mut();
+                ids.remove(id);
+                if ids.is_empty() {
+                    entry.remove();
+                    true
+                } else {
+                    !std::ptr::eq(entry.key().v, band_key.v)
+                }
+            }
+            RawEntryMut::Vacant(entry) => false
         }
     }
 
@@ -515,10 +548,33 @@ where
         ids_distances[0..std::cmp::min(ids_distances.len(), k)].to_vec()
     }
 
-    /// Removes a id from the index.
-    pub fn remove(&mut self, id: &Id) {
-        match self.id_signatures.get(id) {
+    /// Removes a key from the index, returning true if the key
+    /// was previously in the index.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use gaoya::minhash::{MinHasher,MinHasher16V1, MinHashIndex};
+    /// use gaoya::text::whitespace_split;
+    ///
+    /// let mut index = MinHashIndex::new_with_params(33, 3, 0.6);
+    /// let minhasher = MinHasher16V1::new(33 * 3);
+    /// let signature1 = minhasher.create_signature(whitespace_split("This is the first minhashed document"));
+    /// let signature2 = minhasher.create_signature(whitespace_split("This is the second minhashed document"));
+    /// let query = signature1.clone();
+    /// index.insert(1u32, signature1);
+    /// index.insert(2u32, signature2);
+    /// assert_eq!(index.query_owned(&query).into_iter().collect::<Vec<_>>(), vec![1,2]);
+    /// assert_eq!(index.remove(&1), true);
+    /// assert_eq!(index.remove(&1), false);
+    /// ```
+    pub fn remove(&mut self, id: &Id) -> bool {
+        let removed = match self.id_signatures.get(id) {
             Some(hashes) => {
+                if self.removed_ids.contains(id) {
+                    return false;
+                }
                 let fully_removed = self
                     .bands
                     .iter_mut()
@@ -527,18 +583,18 @@ where
                     == self.b;
                 if fully_removed {
                     self.id_signatures.remove(id);
-                    ()
                 } else {
                     self.removed_ids.insert(id.clone());
-                    ()
                 }
                 self.size -= 1;
+                true
             }
-            None => (),
-        }
-        if self.removed_ids.len() > REMOVED_KEYS_COUNT_CLEAN_TRIGGER {
+            None => false,
+        };
+        if removed && self.removed_ids.len() > REMOVED_KEYS_COUNT_CLEAN_TRIGGER {
             self.clean_removed();
         }
+        removed
     }
 
     fn clean_removed(&mut self) {
@@ -821,53 +877,62 @@ mod tests {
         assert!(ret.contains(&3));
     }
 
+    #[cfg(all(feature = "unstable"))]
     #[test]
     pub fn test_remove() {
-        let mut lsh_index = MinHashIndex::new_with_params(3, 2, 0.3);
-        lsh_index.insert(1, vec![1, 1, 1, 2, 2, 2, 3, 3, 3]);
-        lsh_index.insert(2, vec![1, 1, 1, 2, 2, 2, 3, 3, 3]);
-        lsh_index.insert(3, vec![1, 1, 1, 2, 2, 2, 3, 4, 4]);
-        lsh_index.insert(4, vec![1, 1, 1, 2, 2, 2, 3, 4, 3]);
+        let mut lsh_index = MinHashIndex::new_with_params(4, 2, 0.5);
+        lsh_index.insert(1, vec![1, 1,  1, 1,  1, 1,  1, 1]);
+        lsh_index.insert(2, vec![1, 1,  1, 1,  1, 1,  1, 1]);
 
-        lsh_index.insert(5, vec![2, 2, 2, 3, 3, 3, 4, 4, 4]);
-        lsh_index.insert(6, vec![3, 3, 3, 4, 4, 4, 5, 5, 5]);
-        lsh_index.insert(7, vec![3, 3, 3, 4, 4, 4, 5, 5, 5]);
+        lsh_index.insert(3, vec![1, 1,  1, 1,  1, 1,  2, 2]);
+        lsh_index.insert(4, vec![1, 1,  1, 1,  1, 1,  2, 3]);
 
-        let res = lsh_index.query(&vec![1, 1, 1, 2, 2, 2, 3, 3, 3]);
+        lsh_index.insert(5, vec![2, 2,  2, 3,  3, 3,  4, 4]);
+
+        lsh_index.insert(6, vec![3, 3,  3, 4,  4, 4,  5, 5]);
+        lsh_index.insert(7, vec![3, 3,  3, 4,  4, 4,  5, 6]);
+
+        let res = lsh_index.query(&vec![1, 1,  1, 1,  1, 1,  1, 1]);
         assert_eq!(res, vec![1, 2, 3, 4].iter().collect());
 
-        lsh_index.remove(&1);
+        // 1 was inserted first, so its signature is used for 1, 2, 3, 4
+        assert_eq!(lsh_index.remove(&1), true);
         assert_eq!(lsh_index.removed_ids.len(), 1);
-        let res = lsh_index.query(&vec![1, 1, 1, 2, 2, 2, 3, 3, 3]);
+        let res = lsh_index.query(&vec![1, 1,  1, 1,  1, 1,  1, 1]);
         assert_eq!(res, vec![2, 3, 4].iter().collect());
+        assert_eq!(lsh_index.remove(&1), false);
 
+        // the signature of 2 was not used for indexing
         lsh_index.remove(&2);
-        assert_eq!(lsh_index.removed_ids.len(), 2);
-        let res = lsh_index.query(&vec![1, 1, 1, 2, 2, 2, 3, 3, 3]);
+        assert_eq!(lsh_index.removed_ids.len(), 1);
+        let res = lsh_index.query(&vec![1, 1,  1, 1,  1, 1,  1, 1]);
+        assert_eq!(res, vec![3, 4].iter().collect());
+        let res = lsh_index.query(&vec![1, 1,  1, 1,  1, 1,  2, 2]);
         assert_eq!(res, vec![3, 4].iter().collect());
 
         lsh_index.remove(&5);
-        assert_eq!(lsh_index.removed_ids.len(), 2);
-        let res = lsh_index.query(&vec![3, 3, 3, 4, 4, 4, 5, 5, 5]);
-        assert_eq!(res, vec![6, 7].iter().collect());
+        assert_eq!(lsh_index.removed_ids.len(), 1);
+        let res = lsh_index.query(&vec![2, 2,  2, 3,  3, 3,  4, 4]);
+        assert_eq!(res, vec![].iter().collect());
+
+        // 7 can be fully removed
+        lsh_index.remove(&7);
+        assert_eq!(lsh_index.removed_ids.len(), 1);
+        let res = lsh_index.query(&vec![3, 3,  3, 4,  4, 4,  5, 5]);
+        assert_eq!(res, vec![6].iter().collect());
 
         lsh_index.remove(&6);
-        assert_eq!(lsh_index.removed_ids.len(), 3);
-        let res = lsh_index.query(&vec![3, 3, 3, 4, 4, 4, 5, 5, 5]);
-        assert_eq!(res, vec![7].iter().collect());
-
-        lsh_index.remove(&7);
-        assert_eq!(lsh_index.removed_ids.len(), 3);
+        assert_eq!(lsh_index.removed_ids.len(), 1);
         assert_eq!(
             lsh_index.removed_ids,
-            vec![1, 2, 6].into_iter().collect()
+            vec![1].into_iter().collect()
         );
-        let res = lsh_index.query(&vec![3, 3, 3, 4, 4, 4, 5, 5, 5]);
+        let res = lsh_index.query(&vec![3, 3,  3, 4,  4, 4,  5, 6]);
         assert_eq!(res.len(), 0);
 
         lsh_index.clean_removed();
-        assert_eq!(lsh_index.removed_ids.len(), 2);
-        assert_eq!(lsh_index.removed_ids, vec![1, 2].into_iter().collect());
+        assert_eq!(lsh_index.removed_ids.len(), 1);
+        assert_eq!(lsh_index.removed_ids, vec![1].into_iter().collect());
 
         lsh_index.remove(&3);
         lsh_index.remove(&4);
@@ -875,6 +940,74 @@ mod tests {
         assert_eq!(lsh_index.removed_ids.len(), 0);
         assert_eq!(lsh_index.size(), 0);
     }
+
+    #[cfg(not(feature = "unstable"))]
+    #[test]
+    pub fn test_remove() {
+        let mut lsh_index = MinHashIndex::new_with_params(4, 2, 0.5);
+        lsh_index.insert(1, vec![1, 1,  1, 1,  1, 1,  1, 1]);
+        lsh_index.insert(2, vec![1, 1,  1, 1,  1, 1,  1, 1]);
+
+        lsh_index.insert(3, vec![1, 1,  1, 1,  1, 1,  2, 2]);
+        lsh_index.insert(4, vec![1, 1,  1, 1,  1, 1,  2, 3]);
+
+        lsh_index.insert(5, vec![2, 2,  2, 3,  3, 3,  4, 4]);
+
+        lsh_index.insert(6, vec![3, 3,  3, 4,  4, 4,  5, 5]);
+        lsh_index.insert(7, vec![3, 3,  3, 4,  4, 4,  5, 6]);
+
+        let res = lsh_index.query(&vec![1, 1,  1, 1,  1, 1,  1, 1]);
+        assert_eq!(res, vec![1, 2, 3, 4].iter().collect());
+
+        lsh_index.remove(&1);
+        assert_eq!(lsh_index.removed_ids.len(), 1);
+        let res = lsh_index.query(&vec![1, 1,  1, 1,  1, 1,  1, 1]);
+        assert_eq!(res, vec![2, 3, 4].iter().collect());
+
+        // the signature of 2 was not used for indexing
+        lsh_index.remove(&2);
+        assert_eq!(lsh_index.removed_ids.len(), 2);
+        let res = lsh_index.query(&vec![1, 1,  1, 1,  1, 1,  1, 1]);
+        assert_eq!(res, vec![3, 4].iter().collect());
+        let res = lsh_index.query(&vec![1, 1,  1, 1,  1, 1,  2, 2]);
+        assert_eq!(res, vec![3, 4].iter().collect());
+
+        lsh_index.remove(&5);
+        assert_eq!(lsh_index.removed_ids.len(), 2);
+        let res = lsh_index.query(&vec![2, 2,  2, 3,  3, 3,  4, 4]);
+        assert_eq!(res, vec![].iter().collect());
+
+        lsh_index.remove(&7);
+        assert_eq!(lsh_index.removed_ids.len(), 3);
+        let res = lsh_index.query(&vec![3, 3,  3, 4,  4, 4,  5, 5]);
+        assert_eq!(res, vec![6].iter().collect());
+
+        lsh_index.remove(&6);
+        assert_eq!(lsh_index.removed_ids.len(), 3);
+        assert_eq!(
+            lsh_index.removed_ids,
+            vec![1,2,7].into_iter().collect()
+        );
+        let res = lsh_index.query(&vec![3, 3,  3, 4,  4, 4,  5, 6]);
+        assert_eq!(res.len(), 0);
+
+        lsh_index.clean_removed();
+        assert_eq!(lsh_index.removed_ids.len(), 2);
+        assert_eq!(lsh_index.removed_ids, vec![1,2].into_iter().collect());
+
+        lsh_index.remove(&3);
+        assert_eq!(lsh_index.removed_ids.len(), 3);
+        assert_eq!(lsh_index.removed_ids, vec![1,2,3].into_iter().collect());
+
+        lsh_index.remove(&4);
+        assert_eq!(lsh_index.removed_ids.len(), 3);
+        assert_eq!(lsh_index.removed_ids, vec![1,2,3].into_iter().collect());
+
+        lsh_index.clean_removed();
+        assert_eq!(lsh_index.removed_ids.len(), 0);
+        assert_eq!(lsh_index.size(), 0);
+    }
+
 
     #[test]
     pub fn test_lsh_index_batch_construction() {

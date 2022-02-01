@@ -63,6 +63,15 @@ def test_documents():
         else:
             assert set(index.query(doc)) == {4}, str(index.query(doc))
 
+    index.remove(0)
+    index.remove(4)
+
+    for i, doc in enumerate(corpus):
+        if i < 4:
+            assert set(index.query(doc)) == {1, 2, 3}, str(index.query(doc))
+        else:
+            assert set(index.query(doc)) == set(), str(index.query(doc))
+
 
 
 def test_return_similarity():

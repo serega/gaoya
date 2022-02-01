@@ -6,7 +6,7 @@ use crate::TokenizerSpecification;
 use fnv::FnvBuildHasher;
 use gaoya::minhash::{calculate_minhash_params,
                      MinHasher, MinHasher16V1, MinHasher32V1, MinHasher64V1};
-use gaoya::text::{shingle_text, shingle_tokens, shingle_text_range, whitespace_split, MultiShingles};
+use gaoya::text::{shingle_text, shingle_text_range, whitespace_split, MultiShingles};
 use shingles::Shingles;
 use pyo3::exceptions::PyValueError;
 use rayon::prelude::*;
@@ -105,6 +105,10 @@ macro_rules! py_minhash_index {
             pub fn insert_tokens(&mut self, id: i64, tokens: Vec<&str>) {
                 self.inner
                     .insert(id, self.min_hash.create_signature(tokens.iter()));
+            }
+
+            pub fn remove(&mut self, id: i64) {
+                self.inner.remove(&id);
             }
 
             fn bulk_hash_docs(&self, docs: Vec<&str>) -> Vec<Vec<$type>> {
