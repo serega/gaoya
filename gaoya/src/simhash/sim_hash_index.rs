@@ -6,6 +6,7 @@ use fxhash::{FxBuildHasher, FxHashMap};
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::Entry;
 use std::fmt::Debug;
 use std::hash::{BuildHasher, Hash};
 use std::marker::PhantomData;
@@ -17,7 +18,7 @@ where
     S: SimHashBits,
 {
     permutation: Permutation<S>,
-    table: FxHashMap<S, Vec<(S, Id)>>,
+    table: FxHashMap<S, Vec<Id>>,
 }
 
 impl<S, Id> SimHashTable<S, Id>
@@ -37,32 +38,53 @@ where
         self.table
             .entry(key)
             .or_insert(Vec::new())
-            .push((*simhash, id));
+            .push(id);
     }
 
-    fn query<'a, B: BuildHasher>(
-        &'a self,
-        simhash: &S,
-        match_ids: &mut HashSet<&'a Id, B>,
-        max_distance: usize,
-    ) {
-        let key = *simhash & self.permutation.simple_mask;
+    fn query<'a, B: BuildHasher>(&'a self,
+                                 query_signature: &S,
+                                 id_signatures: &FxHashMap<Id, S>,
+                                 match_ids: &mut HashSet<&'a Id, B>,
+                                 max_distance: usize)
+    {
+        let key = *query_signature & self.permutation.simple_mask;
         match self.table.get(&key) {
             Some(candidates) => {
                 let matches = candidates
                     .iter()
-                    .filter(|pair| {
-                        let signature = pair.0;
-                        simhash.hamming_distance(&signature) < max_distance
-                    })
-                    .map(|pair| &pair.1);
-
+                    .filter(|id| {
+                        let signature = id_signatures.get(&id).unwrap();
+                        query_signature.hamming_distance(signature) < max_distance
+                    });
                 match_ids.extend(matches);
             }
             None => (),
         }
     }
 
+    fn query_owned<'a, B: BuildHasher>(&'a self,
+                                       query_signature: &S,
+                                       id_signatures: &FxHashMap<Id, S>,
+                                       match_ids: &mut HashSet<Id, B>,
+                                       max_distance: usize)
+    {
+        let key = *query_signature & self.permutation.simple_mask;
+        match self.table.get(&key) {
+            Some(candidates) => {
+                let matches = candidates
+                    .iter()
+                    .filter(|id| {
+                        let signature = id_signatures.get(&id).unwrap();
+                        query_signature.hamming_distance(signature) < max_distance
+                    })
+                    .map(|id| id.clone());
+
+
+                match_ids.extend(matches);
+            }
+            None => (),
+        }
+    }
 
     fn avg_bucket_count(&self) -> Option<usize> {
         let sum = self.table.values().map(|v| v.len()).sum::<usize>();
@@ -119,7 +141,7 @@ where
         self.id_signatures.insert(id, signature);
     }
 
-    pub fn park_bulk_insert(&mut self, ids: Vec<Id>, signatures: Vec<S>)
+    pub fn par_bulk_insert(&mut self, ids: Vec<Id>, signatures: Vec<S>)
     where
         S: Send + Sync,
         Id: Send + Sync,
@@ -159,11 +181,18 @@ where
     pub fn query(&self, query_signature: &S) -> HashSet<&Id, FxBuildHasher> {
         let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
         for table in &self.hash_tables {
-            table.query(query_signature, &mut match_ids, self.hamming_distance);
+            table.query(query_signature, &self.id_signatures,  &mut match_ids, self.hamming_distance);
         }
         match_ids
     }
 
+    pub fn query_owned(&self, query_signature: &S) -> HashSet<Id, FxBuildHasher> {
+        let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
+        for table in &self.hash_tables {
+            table.query_owned(query_signature, &self.id_signatures,  &mut match_ids, self.hamming_distance);
+        }
+        match_ids
+    }
     pub fn query_return_distance(&self, query_signature: &S) -> Vec<(Id, usize)> {
         let ids = self.query(query_signature);
         let mut result: Vec<_> = ids.into_iter()
@@ -171,6 +200,26 @@ where
             .collect();
         result.sort_unstable_by(|a, b| a.1.cmp(&b.1));
         result
+    }
+
+    pub fn par_bulk_query(&self, signatures: &Vec<S>) -> Vec<HashSet<Id, FxBuildHasher>>
+    where
+        S: Send + Sync,
+        Id: Send + Sync,
+    {
+        signatures.par_iter()
+            .map(|signature| self.query_owned(signature))
+            .collect()
+    }
+
+    pub fn par_bulk_query_return_distance(&self, signatures: &Vec<S>) -> Vec<Vec<(Id, usize)>>
+        where
+            S: Send + Sync,
+            Id: Send + Sync,
+    {
+        signatures.par_iter()
+            .map(|signature| self.query_return_distance(signature))
+            .collect()
     }
 
     pub fn size(&self) -> usize {
