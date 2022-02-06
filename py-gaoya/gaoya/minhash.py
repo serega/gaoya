@@ -4,79 +4,78 @@ from .gaoya import minhash as m
 
 class MinHashStringIndex:
     """
-    MinHashStringIndex.
+    MinHashStringIndex for indexing and searching text documents based jaccard similarity.
 
-    Reference: `Chapter 3, Mining of Massive Datasets
-    <http://www.mmds.org/>`_.
 
-    If  ``hash_size`` and ``num_bands`` is specified ``num_hashes`` is not used, otherwise
-        ``hash_size`` and ``num_bands`` will be calculated according to S-curve.
+    Reference: `Chapter 3, Mining of Massive Datasets <http://www.mmds.org/>`
+    If  `hash_size` and `num_bands` is specified `num_hashes` is not used, otherwise
+        `hash_size` and `num_bands` will be calculated according to S-curve.
 
     Parameters
     ----------
-        hash_size: int, default=32
-            The size of individual hashes in bits in minhash signature. Supported sizes are (16, 32, 64).
-            Bigger hashes offer better accuracy, smaller hashes use less memory.
+    hash_size: int, default=32
+        The size of individual hashes in bits in minhash signature. Supported sizes are (16, 32, 64).
+        Bigger hashes offer better accuracy, smaller hashes use less memory.
 
-        num_bands: int, default=25
-            The number of bands
+    num_bands: int, default=25
+        The number of bands
 
-        band_size: int, default=5
-            The number of hashes in individual band .
-            The signature length is ``num_bands`` * ``band_size``
-            The signature length in bytes is
-            (``num_bands`` * ``band_size`` * ``hash_size``) / 8
+    band_size: int, default=5
+        The number of hashes in individual band .
+        The signature length is `num_bands` * `band_size`
+        The signature length in bytes is
+        (`num_bands` * `band_size` * `hash_size`) / 8
 
-        num_hashes: int, default=None.
-            The number of hashes in the signature. The argument is not used when
-            ``num_bands`` and ``band_size`` are provided.
+    num_hashes: int, default=None.
+        The number of hashes in the signature. The argument is not used when
+        `num_bands` and `band_size` are provided.
 
 
-        jaccard_threshold: float, default=0.75.
-            The jaccard similarity threshold. The query method will return documents that
-            have jaccard similarity threshold greater than ``jaccard_threshold``.
+    jaccard_threshold: float, default=0.75.
+        The jaccard similarity threshold. The query method will return documents that
+        have jaccard similarity threshold greater than ``jaccard_threshold``.
 
-        analyzer : {'word', 'char' } or callable, default='word'
-            To create MinHash signature document must be tokenized into smaller units (features).
-            Whether the feature should be made of word or character n-grams.
-            If a callable is passed it is used to extract the sequence of features
-            out of the raw, unprocessed input. Note, that built-in analyzers are implemented in Rust,
-            and generally faster that similar implementation in Python.
+    analyzer : {'word', 'char' } or callable, default='word'
+        To create MinHash signature document must be tokenized into smaller units (features).
+        Whether the feature should be made of word or character n-grams.
+        If a callable is passed it is used to extract the sequence of features
+        out of the raw, unprocessed input. Note, that built-in analyzers are implemented in Rust,
+        and generally faster that similar implementation in Python.
 
-        lowercase : bool, default=True
-            Convert all characters to lowercase before tokenizing.
+    lowercase : bool, default=False
+        Convert all characters to lowercase before tokenizing.
 
-        ngram_range : tuple (min_n, max_n), default=(1, 1)
-            The lower and upper boundary of the range of n-values for different
-            n-grams to be extracted. All values of n such that min_n <= n <= max_n
-            will be used. For example an ``ngram_range`` of ``(1, 1)`` means only
-            unigrams, ``(1, 2)`` means unigrams and bigrams, and ``(2, 2)`` means
-            only bigrams.
-            Only applies if ``analyzer`` is not callable.
+    ngram_range : tuple (min_n, max_n), default=(1, 1)
+        The lower and upper boundary of the range of n-values for different
+        n-grams to be extracted. All values of n such that min_n <= n <= max_n
+        will be used. For example an `ngram_range` of `(1, 1)`  means only
+        unigrams, `(1, 2)` means unigrams and bigrams, and `(2, 2)` means
+        only bigrams.
+        Only applies if `analyzer` is not callable.
 
-        Examples
-        --------
-        >>> index = gaoya.minhash.MinHashStringIndex(32, 0.5, 42, 3, None, 'word', True, (1,1))
-        >>> corpus = [
-        ...     'This is the first document.',
-        ...     'This document is the second document.',
-        ...     'And this is the third document.',
-        ...     'Is this the first document?',
-        ...     'This not the first nor the second nor the third, but the fourth document'
-        ... ]
-        >>> for i, doc in enumerate(corpus): index.insert_document(i, doc)
-        >>> for i, doc in enumerate(corpus):
-        ...     if i < 4:
-        ...         assert set(index.query(doc)) == {0, 1, 2, 3}, str(index.query(doc))
-        ...      else:
-        ...         assert set(index.query(doc)) == {4}, str(index.query(doc))
-        >>>
+    Examples
+    --------
+            >>> index = gaoya.minhash.MinHashStringIndex(32, 0.5, 42, 3, None, 'word', True, (1,1))
+            >>> corpus = [
+            ...     'This is the first document.',
+            ...     'This document is the second document.',
+            ...     'And this is the third document.',
+            ...     'Is this the first document?',
+            ...     'This not the first nor the second nor the third, but the fourth document'
+            ... ]
+            >>> for i, doc in enumerate(corpus): index.insert_document(i, doc)
+            >>> for i, doc in enumerate(corpus):
+            ...     if i < 4:
+            ...         assert set(index.query(doc)) == {0, 1, 2, 3}, str(index.query(doc))
+            ...      else:
+            ...         assert set(index.query(doc)) == {4}, str(index.query(doc))
+            >>>
         """
 
 
 
     def __init__(self, hash_size=32,
-                 jaccard_threshold=0.7,
+                 jaccard_threshold=0.75,
                  num_bands=20,
                  band_size=5,
                  num_hashes=None,
@@ -102,7 +101,7 @@ class MinHashStringIndex:
 
     def insert_document(self, id, doc):
         """
-        Inserts a document ``doc`` with id ``id`` into the index.
+        Inserts a document `doc` with id `id` into the index.
 
         Parameters
         ----------
@@ -119,9 +118,9 @@ class MinHashStringIndex:
 
     def query(self, doc: str, return_similarity=False) -> Union[List[int], List[Tuple[int, float]]]:
         """
-        Searches the index for documents similar to ``doc``.
+        Searches the index for documents similar to `doc`.
         Returns list of similar document ids.
-        If return_similarity is ``True`` method returns a list of tuples where the first element
+        If return_similarity is `True` method returns a list of tuples where the first element
         is document id and the second is jaccard similarity. The result is sorted by similarity from
         highest to lowest.
 
@@ -146,10 +145,10 @@ class MinHashStringIndex:
             else:
                 return self.index.query(doc)
 
-    def bulk_query(self, docs: List[str], return_similarity=False):
+    def par_bulk_query(self, docs: List[str], return_similarity=False):
         """
-        Searches the index for documents similar to ``docs``.
-        This method uses multiple native threads to execute ``query`` operation on a batch of documents
+        Searches the index for documents similar to `docs`.
+        This method uses multiple native threads to execute `query` operation on a batch of documents
         Returns list of lists of similar document ids or list of lists of tuples
         Parameters
         ----------
