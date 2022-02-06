@@ -124,7 +124,7 @@ impl<B: BuildHasher> MinHasher for MinHasher64V1<B> {
 mod tests {
     use super::MinHasher64V1;
 
-    use crate::minhash::{centroid_minhash, compute_jaccard_similarity, MinHasher};
+    use crate::minhash::{minhash_centroid, compute_jaccard_similarity, MinHasher};
     use crate::text::whitespace_split;
     use std::f64;
 
@@ -162,7 +162,7 @@ mod tests {
             vec![1, 2, 3, 50],
         ];
 
-        let centroid = centroid_minhash(&min_hashes);
+        let centroid = minhash_centroid(&min_hashes);
         assert_eq!(vec![1, 2, 3, 40], centroid);
     }
 }

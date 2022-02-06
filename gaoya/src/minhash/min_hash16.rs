@@ -88,8 +88,8 @@ impl<B: BuildHasher> MinHasher for MinHasher16V1<B> {
 
 #[cfg(test)]
 mod tests {
-
-    use crate::minhash::{centroid_minhash, compute_jaccard_similarity, MinHasher, MinHasher16V1};
+    use std::cmp::min;
+    use crate::minhash::{minhash_centroid, compute_jaccard_similarity, compute_minhash_similarity, MinHasher, MinHasher16V1};
     use crate::text::whitespace_split;
     use std::f64;
 
@@ -118,16 +118,4 @@ mod tests {
         assert!(f32::abs(estimated_similarity - actual_similarity) < 0.1);
     }
 
-    #[test]
-    fn test_min_hash_centroid() {
-        let min_hashes = vec![
-            vec![1, 2, 3, 4],
-            vec![1, 2, 3, 40],
-            vec![1, 20, 3, 40],
-            vec![1, 2, 3, 50],
-        ];
-
-        let centroid = centroid_minhash(&min_hashes);
-        assert_eq!(vec![1, 2, 3, 40], centroid);
-    }
 }

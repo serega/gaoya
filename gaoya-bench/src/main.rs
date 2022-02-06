@@ -26,7 +26,7 @@ fn run_clustering<M: MinHasher>(generated_clusters: &Vec<GeneratedCluster>,
                                 num_bands: usize, band_width: usize, jaccard_threshold: f64)
     where M::V: Clone, M: Sync + Send {
     println!("Creating index {}", std::any::type_name::<M>());
-    let mut lsh = MinHashIndex::new_with_params(num_bands, band_width, jaccard_threshold);
+    let mut lsh = MinHashIndex::new(num_bands, band_width, jaccard_threshold);
     let mut ids = Vec::new();
     let mut vals = Vec::new();
     for cluster in generated_clusters {
@@ -49,10 +49,10 @@ fn run_clustering<M: MinHasher>(generated_clusters: &Vec<GeneratedCluster>,
     println!("Elapsed millis {}. Num clusters {}. Total points {} ", elapsed.as_millis(),  clusters.len(), total);
 
     let centroids: Vec<_> = clusters.iter()
-        .map(|cluster| lsh.calculate_centroid_by_band_majority_v(&cluster.points))
+        .map(|cluster| lsh.calculate_centroid(cluster.points.as_slice()))
         .collect();
 
-    let mut centroid_index = MinHashIndex::new_with_params(num_bands, band_width, jaccard_threshold);
+    let mut centroid_index = MinHashIndex::new(num_bands, band_width, jaccard_threshold);
     for i in 0..clusters.len() {
         centroid_index.insert(clusters[i].cluster_id, centroids[i].clone());
     }
