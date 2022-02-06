@@ -62,27 +62,6 @@ pub trait MinHasher {
             &self.create_signature(iter_2),
         )
     }
-
-    fn calculate_centroid(&self, signatures: &Vec<&Vec<Self::V>>) -> Vec<Self::V> {
-        let signature_len = signatures[0].len();
-        let mut centroid = Vec::with_capacity(signature_len);
-        let mut hash_counters: HashMap<Self::V, usize> = HashMap::new();
-        for signature in signatures.iter() {
-            let mut hash_counters: HashMap<Self::V, usize> = HashMap::new();
-            for hash in signature.iter() {
-                let count = hash_counters.entry(*hash).or_insert(1);
-                *count += 1;
-            }
-
-            let entry = hash_counters.into_iter()
-                .max_by(|x, y| x.1.cmp(&y.1))
-                .unwrap();
-
-            centroid.push(entry.0);
-
-        }
-        centroid
-    }
 }
 
 pub fn compute_jaccard_similarity<T, U>(iter_1: T, iter_2: T) -> f32
