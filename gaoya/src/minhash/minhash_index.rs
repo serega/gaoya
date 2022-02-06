@@ -1,4 +1,4 @@
-use crate::minhash::{calculate_b_and_r, compute_minhash_distance, compute_minhash_similarity};
+use crate::minhash::{calculate_b_and_r, compute_minhash_distance, compute_minhash_similarity, minhash_band_centroid_from_refs, minhash_centroid};
 use fxhash::FxBuildHasher;
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;
@@ -140,11 +140,15 @@ where
         }
     }
 
-    fn best_minhash_index<'a>(
+    /// Returns the index of signature that gives highest recall
+    /// of this band on points that are not in all_ids.
+    /// Used by centroid calculation to choose the most optimal
+    /// band portion of the hash
+    fn find_signature_with_highest_recall<'a>(
         &'a self,
         signatures: &Vec<&[T]>,
         all_ids: &mut HashSet<&'a Id>,
-    ) -> isize {
+    ) -> Option<usize> {
         let mut max_count: usize = 0;
         let mut best_index: isize = -1;
         for minhash in signatures.iter().enumerate() {
@@ -154,7 +158,9 @@ where
             };
             match self.hash_table.get(&band_key) {
                 Some(ids) => {
-                    let new_count = ids.iter().map(|id| !all_ids.contains(&id) as usize).count();
+                    let new_count = ids.iter()
+                        .map(|id| !all_ids.contains(&id) as usize)
+                        .count();
                     if new_count > max_count {
                         max_count = new_count;
                         best_index = minhash.0 as isize;
@@ -169,13 +175,15 @@ where
         };
         match self.hash_table.get(&band_key) {
             Some(ids) => {
-                for id in ids {
-                    all_ids.insert(id);
-                }
+                all_ids.extend(ids.iter())
             }
             None => (),
         }
-        best_index
+        if best_index >= 0 {
+            Some(best_index as usize)
+        } else {
+            None
+        }
     }
 
     /// Removes id from the band
@@ -253,6 +261,19 @@ where
     }
 }
 
+/// Data Structure to index minhashes into bands.
+///
+/// Reference: [Chapter 3, Mining of Massive Datasets](http://www.mmds.org)
+/// MinHashIndex implements classic banding technique described in MMDS book.
+/// Full MinHash signatures are stored in the index. [`MinHashIndex::query`](struct.MinHashIndex.html#method.query)
+/// selects candidates from each band, then filters candidates by calculating full
+/// jaccard similarity between the query and the candidate.
+/// Configuration parameters to [`MinHashIndex::new`](struct.MinHashIndex.html#method.new)
+/// `num_bands` and `band_width` correspond to `b` and `r` in MMDS book.
+///
+///
+///
+///
 pub struct MinHashIndex<T, Id>
 where
     T: Hash + Eq,
@@ -283,10 +304,11 @@ where
 
 impl<T, Id> MinHashIndex<T, Id>
 where
-    T: Hash + Eq,
+    T: Hash + Eq + Copy,
     Id: Hash + Eq + Clone,
 {
-    pub fn new_with_params(num_bands: usize, band_width: usize, threshold: f64) -> Self {
+    /// Create a new MinHashIndex
+    pub fn new(num_bands: usize, band_width: usize, jaccard_threshold: f64) -> Self {
         let mut bands = Vec::new();
         for i in 0..num_bands {
             let (start, end) = (i * band_width, (i + 1) * band_width);
@@ -297,7 +319,7 @@ where
         MinHashIndex {
             bands: bands,
             removed_ids: HashSet::new(),
-            threshold: threshold,
+            threshold: jaccard_threshold,
             id_signatures: hash_table,
             b: num_bands,
             r: band_width,
@@ -305,8 +327,8 @@ where
         }
     }
 
-    pub fn new_with_params_and_capacity(num_bands: usize, band_width: usize,
-                                        jaccard_threshold: f64, initial_capacity: usize) -> Self {
+    pub fn new_with_capacity(num_bands: usize, band_width: usize,
+                             jaccard_threshold: f64, initial_capacity: usize) -> Self {
         let mut bands = Vec::new();
         for i in 0..num_bands {
             let (start, end) = (i * band_width, (i + 1) * band_width);
@@ -558,7 +580,7 @@ where
     /// use gaoya::minhash::{MinHasher,MinHasher16V1, MinHashIndex};
     /// use gaoya::text::whitespace_split;
     ///
-    /// let mut index = MinHashIndex::new_with_params(33, 3, 0.6);
+    /// let mut index = MinHashIndex::new(33, 3, 0.6);
     /// let minhasher = MinHasher16V1::new(33 * 3);
     /// let signature1 = minhasher.create_signature(whitespace_split("This is the first minhashed document"));
     /// let signature2 = minhasher.create_signature(whitespace_split("This is the second minhashed document"));
@@ -644,186 +666,77 @@ where
         result
     }
 
-    pub fn calculate_centroid<S: BuildHasher>(
-        &self,
-        ids: &HashSet<&Id, S>,
-        starting_centroid: &Vec<T>,
-    ) -> Vec<T>
-    where
-        T: Clone,
-    {
-        self.calculate_centroid_by_band_majority(ids)
+    /// Calculates minhash centroid that optimizes recall for this `MinHashIndex` configuration
+    pub fn calculate_centroid(&self, ids: &[Id]) -> Vec<T> where
+         {
+
+        let signatures = ids.iter()
+            .map(|id| self.id_signatures.get(&id))
+            .filter(|option| option.is_some())
+            .map(|option| option.unwrap())
+            .collect();
+        minhash_band_centroid_from_refs(&signatures, self.b, self.r)
     }
 
-    pub fn calculate_centroid_from_starting(
-        &self,
-        ids: &HashSet<&Id>,
-        starting_centroid: &Vec<T>,
-    ) -> Vec<T>
+    pub fn calculate_centroid_experimental<I>(&self,  ids: I) -> Vec<T>
     where
-        T: Clone,
-    {
+        I: Iterator<Item = Id> {
         let mut bands: Vec<HashSet<&[T]>> = Vec::new();
         for i in 0..self.b {
             bands.push(HashSet::new());
         }
+        let mut first_signature = None;
         for id in ids {
             let mut signature = self.id_signatures.get(&id).unwrap();
             for i in 0..self.b {
                 let band: &[T] = &signature[self.band_range(i)];
                 bands[i].insert(band);
             }
-        }
 
-        let mut all_ids: HashSet<&Id> = ids.iter().map(|id| id.clone()).collect();
-        let mut centroid = Vec::new();
-        for i in 0..self.b {
-            let band = &self.bands[i];
-            let band_signatures = bands[i].iter().map(|k| *k).collect();
-            let index = band.best_minhash_index(&band_signatures, &mut all_ids);
-            if index >= 0 {
-                centroid.extend_from_slice(&band_signatures[index as usize]);
-            } else {
-                let sl: &[T] = &starting_centroid[i * self.r..(i + 1) * self.r];
-                centroid.extend_from_slice(sl);
-            }
+            match first_signature {
+                None => {
+                    first_signature.insert(signature);
+                }
+                Some(_) => {}
+            };
         }
-        assert_eq!(starting_centroid.len(), centroid.len());
-        centroid
-    }
-
-    pub fn calculate_centroid_(&self, ids: &HashSet<&Id>) -> Vec<T>
-    where
-        T: Clone
-    {
-        let mut bands: Vec<HashSet<&[T]>> = Vec::new();
-        for i in 0..self.b {
-            bands.push(HashSet::new());
-        }
-        for id in ids {
-            let mut signature = self.id_signatures.get(&id).unwrap();
-            for i in 0..self.b {
-                let band: &[T] = &signature[self.band_range(i)];
-                bands[i].insert(band);
-            }
-        }
+        let first_signature = first_signature.unwrap();
         let mut all_ids = HashSet::new();
-        let mut centroid = Vec::new();
+        let mut centroid_signature = Vec::new();
         for i in 0..self.b {
-            let band = &self.bands[i];
-            let band_signatures = bands[i].iter().map(|k| *k).collect();
-            let index = band.best_minhash_index(&band_signatures, &mut all_ids);
-            centroid.extend_from_slice(&band_signatures[index as usize]);
+            let band: &MinHashBand<T, Id> = &self.bands[i];
+            let band_signatures: Vec<&[T]> = bands[i].iter().map(|k| *k).collect();
+            let index = band.find_signature_with_highest_recall(&band_signatures, &mut all_ids);
+            match index {
+                Some(index) => {
+                    centroid_signature.extend_from_slice(&band_signatures[index]);
+                }
+                None => {
+                    centroid_signature.extend_from_slice(&first_signature[self.band_range(i)]);
+                }
+            }
+
         }
 
-        centroid
+        centroid_signature
     }
 
     fn band_range(&self, band_index: usize) -> Range<usize> {
         band_index * self.r..(band_index + 1) * self.r
     }
 
-    pub fn calculate_centroid_by_band_majority_v(
-        &self,
-        ids: &Vec<Id>,
-    ) -> Vec<T>
-        where
-            T: Clone,
-    {
-        let mut band_counters: Vec<HashMap<&[T], usize>> = Vec::new();
-        for i in 0..self.b {
-            band_counters.push(HashMap::new());
-        }
-
-        for id in ids {
-            let signature = self.id_signatures.get(&id).unwrap();
-            for i in 0..self.b {
-                let band: &[T] = &signature[self.band_range(i)];
-                let count = band_counters[i].entry(band).or_insert(1);
-                *count += 1;
-            }
-        }
-
-        let mut centroid = Vec::new();
-        for counter in band_counters {
-            let mut band_counts = counter.iter().collect::<Vec<(_, &usize)>>();
-            band_counts.sort_unstable_by(|a, b| b.1.cmp(a.1));
-            centroid.extend_from_slice(band_counts[0].0.clone());
-        }
-        centroid
-    }
-
-
-
-    pub fn calculate_centroid_by_band_majority<S: BuildHasher>(
-        &self,
-        ids: &HashSet<&Id, S>,
-    ) -> Vec<T>
-    where
-        T: Clone,
-    {
-        let mut band_counters: Vec<HashMap<&[T], usize>> = Vec::new();
-        for i in 0..self.b {
-            band_counters.push(HashMap::new());
-        }
-
-        for id in ids {
-            let signature = self.id_signatures.get(&id).unwrap();
-            for i in 0..self.b {
-                let band: &[T] = &signature[self.band_range(i)];
-                let count = band_counters[i].entry(band).or_insert(1);
-                *count += 1;
-            }
-        }
-
-        let mut centroid = Vec::new();
-        for counter in band_counters {
-            let mut band_counts = counter.iter().collect::<Vec<(_, &usize)>>();
-            band_counts.sort_unstable_by(|a, b| b.1.cmp(a.1));
-            centroid.extend_from_slice(band_counts[0].0.clone());
-        }
-        centroid
-    }
-
-    pub fn calculate_centroid_by_hash_majority(&self, ids: &HashSet<&Id>) -> Vec<T>
-    where
-        Id: Hash + Eq + Clone,
-        T: Clone + Copy,
-    {
-        let mut counters: Vec<HashMap<&T, usize>> = Vec::new();
-
-        for i in 0..self.num_perms() {
-            counters.push(HashMap::new());
-        }
-
-        for id in ids {
-            let signature = self.id_signatures.get(&id).unwrap();
-            for hash in signature.iter().enumerate() {
-                let count = counters[hash.0].entry(hash.1).or_insert(1);
-                *count += 1;
-            }
-        }
-
-        let mut centroid = Vec::new();
-        for counter in counters {
-            let mut l = counter.iter().collect::<Vec<(&&T, &usize)>>();
-            l.sort_unstable_by(|a, b| b.1.cmp(a.1));
-            centroid.push(*l[0].0.clone());
-        }
-        centroid
-    }
 }
 
 impl<T, Id> QueryIndex for MinHashIndex<T, Id>
     where
-        T: Hash + Eq,
+        T: Hash + Eq + Copy,
         Id: Hash + Eq + Clone {
     type Id = Id;
 
     fn query(&self, id: &Self::Id) -> HashSet<&Self::Id, FxBuildHasher> {
         match self.id_signatures.get(id) {
             Some(signature) => {
-                self.query(&signature)
+                self::MinHashIndex::query(self, signature)
             }
             None => HashSet::default()
         }
@@ -851,7 +764,7 @@ mod tests {
     pub fn test_lsh_index() {
         let (b, r) = calculate_minhash_params(0.5, 200);
         let min_hash = MinHasher64V1::new(b * r);
-        let mut lsh_index = MinHashIndex::new_with_params(b, r, 0.5);
+        let mut lsh_index = MinHashIndex::new(b, r, 0.5);
         lsh_index.insert(1, min_hash.create_signature(S1.split_whitespace()));
         lsh_index.insert(2, min_hash.create_signature(S2.split_whitespace()));
         lsh_index.insert(3, min_hash.create_signature(S3.split_whitespace()));
@@ -880,7 +793,7 @@ mod tests {
     #[cfg(all(feature = "unstable"))]
     #[test]
     pub fn test_remove() {
-        let mut lsh_index = MinHashIndex::new_with_params(4, 2, 0.5);
+        let mut lsh_index = MinHashIndex::new(4, 2, 0.5);
         lsh_index.insert(1, vec![1, 1,  1, 1,  1, 1,  1, 1]);
         lsh_index.insert(2, vec![1, 1,  1, 1,  1, 1,  1, 1]);
 
@@ -944,7 +857,7 @@ mod tests {
     #[cfg(not(feature = "unstable"))]
     #[test]
     pub fn test_remove() {
-        let mut lsh_index = MinHashIndex::new_with_params(4, 2, 0.5);
+        let mut lsh_index = MinHashIndex::new(4, 2, 0.5);
         lsh_index.insert(1, vec![1, 1,  1, 1,  1, 1,  1, 1]);
         lsh_index.insert(2, vec![1, 1,  1, 1,  1, 1,  1, 1]);
 
@@ -1013,7 +926,7 @@ mod tests {
     pub fn test_lsh_index_batch_construction() {
         let (b, r) = calculate_minhash_params(0.5, 200);
         let min_hash = MinHasher64V1::new(b * r);
-        let mut lsh_index: MinHashIndex<u64, u64> = MinHashIndex::new_with_params(b, r, 0.5);
+        let mut lsh_index: MinHashIndex<u64, u64> = MinHashIndex::new(b, r, 0.5);
         let mut signatures: Vec<(u64, Vec<u64>)> = Vec::new();
         signatures.push((1, min_hash.create_signature(S1.split_whitespace())));
         signatures.push((2, min_hash.create_signature(S2.split_whitespace())));
@@ -1062,7 +975,7 @@ mod tests {
     pub fn test_lsh_index_batch_construction2() {
         let (b, r) = calculate_minhash_params(0.5, 128);
         let min_hash = MinHasher64V1::new(128);
-        let mut lsh_index: MinHashIndex<u64, u64> = MinHashIndex::new_with_params(b, r, 0.5);
+        let mut lsh_index: MinHashIndex<u64, u64> = MinHashIndex::new(b, r, 0.5);
 
         let mut vecs = Vec::new();
         let rand_range = Uniform::from(1..100000);

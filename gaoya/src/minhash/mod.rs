@@ -25,7 +25,7 @@ use rayon::prelude::*;
 pub trait MinHasher {
     /// The data type of individual hash.
     /// This should be one of u-numeric types such as u64, u32, u16, u8
-    type V: Hash + Eq + Sync + Send;
+    type V: Hash + Eq + Sync + Send + Copy;
 
     fn create_signature<T, U>(&self, iter: T) -> Vec<Self::V>
         where
@@ -61,6 +61,27 @@ pub trait MinHasher {
             &self.create_signature(iter_1),
             &self.create_signature(iter_2),
         )
+    }
+
+    fn calculate_centroid(&self, signatures: &Vec<&Vec<Self::V>>) -> Vec<Self::V> {
+        let signature_len = signatures[0].len();
+        let mut centroid = Vec::with_capacity(signature_len);
+        let mut hash_counters: HashMap<Self::V, usize> = HashMap::new();
+        for signature in signatures.iter() {
+            let mut hash_counters: HashMap<Self::V, usize> = HashMap::new();
+            for hash in signature.iter() {
+                let count = hash_counters.entry(*hash).or_insert(1);
+                *count += 1;
+            }
+
+            let entry = hash_counters.into_iter()
+                .max_by(|x, y| x.1.cmp(&y.1))
+                .unwrap();
+
+            centroid.push(entry.0);
+
+        }
+        centroid
     }
 }
 
@@ -139,53 +160,78 @@ pub fn similarity_greater_than_threshold<T>(
     false
 }
 
-fn centroid_minhash<T>(minhashes: &Vec<Vec<T>>) -> Vec<T>
-    where
-        T: Hash + Copy + Eq,
+fn minhash_centroid<T>(signatures: &Vec<Vec<T>>) -> Vec<T>
+where
+    T: Hash + Copy + Eq,
 {
-    let mut counters = Vec::new();
-    let minhash_len = minhashes[0].len();
-    for i in 0..minhash_len {
-        counters.push(HashMap::new());
-    }
-    for v in minhashes {
-        for i in 0..v.len() {
-            let count = counters[i].entry(v[i]).or_insert(1);
+    let signature_len = signatures[0].len();
+    let mut centroid = Vec::with_capacity(signature_len);
+    let mut hash_counters: Vec<HashMap<T, usize>> = vec![HashMap::new(); signature_len];
+    for signature in signatures.iter() {
+        for (i, hash) in signature.iter().enumerate() {
+            let count = hash_counters[i].entry(*hash).or_insert(1);
             *count += 1;
         }
+
+    }
+    for counter in hash_counters {
+        let most_frequent_hash = counter.into_iter()
+            .max_by(|x, y| x.1.cmp(&y.1))
+            .unwrap().0;
+        centroid.push(most_frequent_hash);
     }
 
-    let mut centroid = Vec::new();
-    for counter in counters {
-        let mut l = counter.iter().collect::<Vec<(&T, &u32)>>();
-        l.sort_unstable_by(|a, b| b.1.cmp(a.1));
-        centroid.push(l[0].0.clone());
-    }
     centroid
+
 }
 
-fn centroid_minhash_from_refs<T>(minhashes: &Vec<&Vec<T>>) -> Vec<T>
+fn minhash_band_centroid_from_refs<T>(signatures: &Vec<&Vec<T>>, num_bands: usize, band_size: usize) -> Vec<T>
     where
         T: Hash + Copy + Eq,
 {
-    let mut counters = Vec::new();
-    let minhash_len = minhashes[0].len();
-    for i in 0..minhash_len {
-        counters.push(HashMap::new());
+    let mut band_counters: Vec<HashMap<&[T], usize>> = Vec::new();
+    for i in 0..num_bands {
+        band_counters.push(HashMap::new());
     }
-    for v in minhashes {
-        for i in 0..v.len() {
-            let count = counters[i].entry(v[i]).or_insert(1);
+
+    for signature in signatures.iter() {
+        for i in 0..num_bands {
+            let band: &[T] = &signature[i * band_size..(i + 1) * band_size];
+            let count = band_counters[i].entry(band).or_insert(1);
             *count += 1;
         }
     }
 
     let mut centroid = Vec::new();
+    for counter in band_counters {
+        let most_frequent_band = counter.into_iter()
+            .max_by(|x, y| x.1.cmp(&y.1))
+            .unwrap().0;
+        centroid.extend_from_slice(most_frequent_band);
+    }
+    centroid
 
-    for counter in counters {
-        let mut l = counter.iter().collect::<Vec<(&T, &u32)>>();
-        l.sort_unstable_by(|a, b| b.1.cmp(a.1));
-        centroid.push(l[0].0.clone());
+}
+
+fn minhash_centroid_from_refs<T>(signatures: &Vec<&Vec<T>>) -> Vec<T>
+    where
+        T: Hash + Copy + Eq,
+{
+    let signature_len = signatures[0].len();
+    let mut centroid = Vec::with_capacity(signature_len);
+    let mut hash_counters: Vec<HashMap<T, usize>> = vec![HashMap::new(); signature_len];
+    for signature in signatures.iter() {
+        for (i, hash) in signature.iter().enumerate() {
+            let count = hash_counters[i].entry(*hash).or_insert(1);
+            *count += 1;
+        }
+
+    }
+    for counter in hash_counters {
+        let most_frequent_hash = counter.into_iter()
+            .max_by(|x, y| x.1.cmp(&y.1))
+            .unwrap().0;
+        centroid.push(most_frequent_hash);
     }
 
     centroid
@@ -240,3 +286,46 @@ fn calculate_b_and_r(s: f64, n: usize, p: f64) -> (usize, usize) {
     (b, r)
 }
 
+
+#[cfg(test)]
+mod tests {
+    use std::cmp::min;
+    use crate::minhash::{minhash_centroid, compute_minhash_similarity};
+
+
+    #[test]
+    fn test_min_hash_centroid() {
+        let min_hashes = vec![
+            vec![1, 2,  3, 4,  5],
+            vec![1, 2,  3, 40, 51],
+            vec![1, 20, 3, 40, 52],
+            vec![1, 2,  3, 50, 55],
+            vec![1, 2,  3, 60, 55],
+        ];
+
+        let centroid = minhash_centroid(&min_hashes);
+        assert_eq!(vec![1, 2, 3, 40, 55], centroid);
+
+        // the minhash jaccard similarity from centroid to any point should be
+        // greater than pairwise similarity of every point
+        let pairwise_similarities: Vec<Vec<f64>> = min_hashes.iter()
+            .map(|m1| {
+                min_hashes.iter()
+                    .map(|m2| compute_minhash_similarity(m1, m2))
+                    .collect()
+
+            }).collect();
+
+        let sums_similarity_from_points: Vec<f64> = pairwise_similarities.iter()
+            .map(|similarities| similarities.iter().sum())
+            .collect();
+
+        let sum_similarity_from_centroid: f64 = min_hashes.iter()
+            .map(|minhash| compute_minhash_similarity(minhash, &centroid))
+            .sum();
+
+        for s in sums_similarity_from_points {
+            assert!(sum_similarity_from_centroid > s);
+        }
+    }
+}

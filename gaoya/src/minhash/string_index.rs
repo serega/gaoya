@@ -30,7 +30,7 @@ impl MinHashStringIndex {
 
     pub fn new(num_bands: usize, band_width: usize, jaccard_threshold: f64) -> Self {
         MinHashStringIndex {
-            lsh_index: MinHashIndex::new_with_params(num_bands, band_width, jaccard_threshold),
+            lsh_index: MinHashIndex::new(num_bands, band_width, jaccard_threshold),
             min_hash: MinHasher64V1::new(num_bands * band_width),
             doc_map: HashMap::new(),
             doc_id: 0,
