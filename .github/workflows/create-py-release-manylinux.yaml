@@ -2,8 +2,8 @@ name: Create Python release manylinux
 
 on:
   push:
-    tags:
-      - '*'
+#    tags:
+#      - '*'
 
 jobs:
   build_manylinux:

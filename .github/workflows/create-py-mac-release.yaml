@@ -2,8 +2,8 @@ name: Create macOs universal2 python release
 
 on:
   push:
-    tags:
-      - '*'
+#    tags:
+#      - '*'
 jobs:
   build:
     name: Create Release
@@ -38,4 +38,4 @@ jobs:
         with:
           maturin-version: 0.12.6
           command: publish
-          args: -m py-gaoya/Cargo.toml --no-sdist --universal2 -o wheels -i python -r https://test.pypi.org/legacy/ --username serenky
+          args: -m py-gaoya/Cargo.toml --no-sdist --universal2 -o wheels -i python  --username serenky
