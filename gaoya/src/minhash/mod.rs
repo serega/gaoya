@@ -5,12 +5,13 @@ mod min_hash64;
 
 mod minhash_index;
 mod string_index;
+mod super_min_hash;
 
 pub use self::hashers::SipHasher24BuildHasher;
 pub use self::hashers::Sha1Hasher;
 pub use self::min_hash16::MinHasher16V1;
 pub use self::min_hash32::{
-    MinHasher32V1, MinHasher32V2, SuperMinHasher32V1, SuperMinHash32V2,
+    MinHasher32V1, MinHasher32V2,
 };
 pub use self::min_hash64::MinHasher64V1;
 pub use self::minhash_index::MinHashIndex;
