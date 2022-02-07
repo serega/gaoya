@@ -34,8 +34,8 @@ jobs:
       - name: maturin publish
         uses: messense/maturin-action@v1
         env:
-          MATURIN_PASSWORD: ${{ secrets.TEST_PYPI_PASS }}
+          MATURIN_PASSWORD: ${{ secrets.PYPI_PASS }}
         with:
           maturin-version: 0.12.6
           command: publish
-          args: -m py-gaoya/Cargo.toml --no-sdist --universal2 -o wheels -i python -r https://test.pypi.org/legacy/ --username serega
+          args: -m py-gaoya/Cargo.toml --no-sdist --universal2 -o wheels -i python -r https://test.pypi.org/legacy/ --username serenky

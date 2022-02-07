@@ -12,6 +12,7 @@ use core::{fmt, mem};
 
 use num_traits::{One, Zero};
 use std::cmp::Ordering;
+use std::f64::consts::PI;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 use std::ops::{
@@ -46,6 +47,10 @@ pub trait SimHashBits:
     fn to_u64_high_bits(self) -> u64;
 
     fn hamming_distance(&self, rhs: &Self) -> usize;
+
+    fn hamming_angle(&self, rhs: &Self) -> f64 {
+        self.hamming_distance(rhs) as f64 * (PI /  Self::bit_length() as f64)
+    }
 
     fn bit_length() -> usize;
 }

@@ -76,10 +76,13 @@ where
         }
         centroid
     }
+
+
 }
 
 #[cfg(test)]
 mod tests {
+    use num_traits::real::Real;
     use super::SimHash;
     use crate::simhash::sim_hasher::SimSipHasher128;
     use crate::simhash::sim_hasher::{ShaHasher64, SimSipHasher64};
@@ -113,4 +116,5 @@ mod tests {
         println!("{:b}", s1);
         println!("s1 {} s2  {} distance {}", s1, s2, s1.hamming_distance(&s2));
     }
+
 }
