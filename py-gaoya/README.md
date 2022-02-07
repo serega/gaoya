@@ -2,8 +2,7 @@
 
 ## About
 This project implements Locality Sensitive Hashing algorithms and data structures for indexing and querying text documents. 
-The primary use cases
-for Gaoya are deduplication and clustering.
+The primary use cases for Gaoya are deduplication and clustering.
 
 * MinHash | SimHash
 * Powered by Rust
@@ -12,7 +11,14 @@ for Gaoya are deduplication and clustering.
 
 ```python
 >>> import gaoya
->>> index = gaoya.minhash.MinHashStringIndex(hash_size=32, jaccard_threshold=0.5, num_bands=42, band_size=3, analyzer='word', lowercase=True, ngram_range=(1,1))
+>>> index = gaoya.minhash.MinHashStringIndex(hash_size=32, 
+                                             jaccard_threshold=0.5, 
+                                             num_bands=42, 
+                                             band_size=3,
+                                             num_hashes=42*3,
+                                             analyzer='word', 
+                                             lowercase=True, 
+                                             ngram_range=(1,1))
 >>> corpus = [
 ...     'This is the first document.',
 ...     'This document is the second document.',
@@ -38,3 +44,8 @@ $ pip3 install gaoya
 [Document Deduplication with Gaoya](https://github.com/serega/gaoya/blob/master/py-gaoya/examples/deduplication_scholarly_articles_gaoya.ipynb)
 
 ## References
+[[1] Chapter 3, Mining of Massive Datasets](http://www.mmds.org)
+
+[[2] Similarity Estimation Techniques from Rounding Algorithms](https://www.cs.princeton.edu/courses/archive/spr04/cos598B/bib/CharikarEstim.pdf)
+
+[[3] Detecting Near-Duplicates for Web Crawling](https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/33026.pdf)

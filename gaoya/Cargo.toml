@@ -4,6 +4,8 @@ version = "0.1.0"
 authors = ["Sergejs Melderis <sergey.melderis@gmail.com>"]
 edition = "2021"
 
+exclude = ["*super_min_hash.rs", "src/clustering"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [profile.release]
 debug = true

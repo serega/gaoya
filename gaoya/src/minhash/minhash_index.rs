@@ -264,6 +264,7 @@ where
 /// Data Structure to index minhashes into bands.
 ///
 /// Reference: [Chapter 3, Mining of Massive Datasets](http://www.mmds.org)
+///
 /// MinHashIndex implements classic banding technique described in MMDS book.
 /// Full MinHash signatures are stored in the index. [`MinHashIndex::query`](struct.MinHashIndex.html#method.query)
 /// selects candidates from each band, then filters candidates by calculating full
@@ -271,13 +272,42 @@ where
 /// Configuration parameters to [`MinHashIndex::new`](struct.MinHashIndex.html#method.new)
 /// `num_bands` and `band_width` correspond to `b` and `r` in MMDS book.
 ///
+/// # Examples
 ///
+/// ```
+/// use gaoya::minhash::{MinHashIndex, MinHasher32V1, MinHasher} ;
+/// use gaoya::text::whitespace_split;
+/// use fxhash::FxHashSet;
+/// let corpus = [
+///     "This is the first document.",
+///     "This document is the second document.",
+///     "And this is the third document.",
+///     "Is this the first document?",
+///     "This not the first nor the second nor the third, but the fourth document"];
+/// let (num_bands, band_width) = (42, 3);
+/// let minhasher = MinHasher32V1::new(num_bands * band_width);
+/// let mut index = MinHashIndex::new(num_bands, band_width, 0.5);
+/// for (i, doc) in corpus.iter().enumerate() {
+///     index.insert(i, minhasher.create_signature(whitespace_split(&doc.to_lowercase())));
+/// }
+/// for (i, doc) in corpus.iter().enumerate() {
+///     if i < 4 {
+///         let mut expected = FxHashSet::default();
+///         expected.extend(vec![0, 1, 2, 3].into_iter());
+///         assert_eq!(index.query_owned(&minhasher.create_signature(whitespace_split(&doc.to_lowercase()))), expected);
+///     } else {
+///         let mut expected = FxHashSet::default();
+///         expected.insert(4);
+///         assert_eq!(index.query_owned(&minhasher.create_signature(whitespace_split(&doc.to_lowercase()))), expected);
+///     }
+/// }
 ///
-///
+/// ```
+#[derive()]
 pub struct MinHashIndex<T, Id>
-where
-    T: Hash + Eq,
-    Id: Hash + Eq + Clone,
+    where
+        T: Hash + Eq,
+        Id: Hash + Eq + Clone,
 {
     bands: Vec<MinHashBand<T, Id>>,
     removed_ids: HashSet<Id>,
@@ -747,11 +777,13 @@ impl<T, Id> QueryIndex for MinHashIndex<T, Id>
 #[cfg(test)]
 mod tests {
     use crate::minhash::min_hash64::MinHasher64V1;
-    use crate::minhash::{calculate_b_and_r, calculate_minhash_params, MinHasher, MinHashIndex};
+    use crate::minhash::{calculate_b_and_r, calculate_minhash_params, MinHasher, MinHasher32V1, MinHashIndex};
     use rand::distributions::{Distribution, Uniform};
     use rand::prelude::ThreadRng;
     use rand::{thread_rng, Rng};
     use std::borrow::Borrow;
+    use fxhash::FxHashSet;
+    use crate::text::whitespace_split;
 
     static S1: &'static str = "local sensitive hashing is cool";
     static S2: &'static str = "local sensitive hashing is great";
@@ -788,6 +820,33 @@ mod tests {
         assert_eq!(ret.len(), 2);
         assert!(ret.contains(&1));
         assert!(ret.contains(&3));
+    }
+
+    #[test]
+    pub fn test_example() {
+        let corpus = [
+            "This is the first document.",
+            "This document is the second document.",
+            "And this is the third document.",
+            "Is this the first document?",
+            "This not the first nor the second nor the third, but the fourth document"];
+        let minhasher = MinHasher32V1::new(42 * 3);
+        let mut index = MinHashIndex::new(42, 3, 0.5);
+        for (i, doc) in corpus.iter().enumerate() {
+            index.insert(i, minhasher.create_signature(whitespace_split(&doc.to_lowercase())));
+        }
+        for (i, doc) in corpus.iter().enumerate() {
+            if i < 4 {
+                let mut expected = FxHashSet::default();
+                expected.extend(vec![0, 1, 2, 3].into_iter());
+                assert_eq!(index.query_owned(&minhasher.create_signature(whitespace_split(&doc.to_lowercase()))), expected);
+            } else {
+                let mut expected = FxHashSet::default();
+                expected.insert(4);
+                assert_eq!(index.query_owned(&minhasher.create_signature(whitespace_split(&doc.to_lowercase()))), expected);
+            }
+        }
+
     }
 
     #[cfg(all(feature = "unstable"))]
