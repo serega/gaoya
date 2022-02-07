@@ -1,11 +1,11 @@
 # Gaoya
 
 ## About
-This project implements Locality Sensitive Hashing algorithms (MinHash, SimHash),
-and data structures for indexing and querying text documents. The main usecases
+This project implements Locality Sensitive Hashing algorithms and data structures for indexing and querying text documents. 
+The primary use cases
 for Gaoya are deduplication and clustering.
 
-
+* MinHash | SimHash
 * Powered by Rust
 * Multi-threaded
 
@@ -29,8 +29,12 @@ for Gaoya are deduplication and clustering.
 ```
 
 ## Installation
-
 ```
 $ pip3 install gaoya
 ```
 
+
+## Examples
+[Document Deduplication with Gaoya](https://github.com/serega/gaoya/blob/master/py-gaoya/examples/deduplication_scholarly_articles_gaoya.ipynb)
+
+## References
