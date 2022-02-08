@@ -3,8 +3,13 @@ name = "gaoya"
 version = "0.1.0"
 authors = ["Sergejs Melderis <sergey.melderis@gmail.com>"]
 edition = "2021"
+readme = "../README.md"
+homepage = "https://github.com/serega/gaoya"
+repository = "https://github.com/serega/gaoya"
+license = "MIT"
+keywords = ["lsh", "locality sensitive hashing", "neardup", "dedup"]
 
-exclude = ["*super_min_hash.rs", "src/clustering"]
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [profile.release]
