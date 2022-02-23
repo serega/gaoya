@@ -22,11 +22,23 @@ use std::iter::FromIterator;
 use fxhash::FxBuildHasher;
 use rayon::prelude::*;
 
+/// MinHashType can be any integer.
+pub trait MinHashType: Hash + Eq + Send + Sync + Copy {}
+impl MinHashType for u64 {}
+impl MinHashType for u32 {}
+impl MinHashType for u16 {}
+impl MinHashType for u8 {}
+impl MinHashType for i64 {}
+impl MinHashType for i32 {}
+impl MinHashType for i16 {}
+impl MinHashType for i8 {}
+
+
 
 pub trait MinHasher {
     /// The data type of individual hash.
     /// This should be one of u-numeric types such as u64, u32, u16, u8
-    type V: Hash + Eq + Sync + Send + Copy;
+    type V: MinHashType;
 
     fn create_signature<T, U>(&self, iter: T) -> Vec<Self::V>
         where
