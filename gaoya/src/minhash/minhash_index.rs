@@ -1,4 +1,4 @@
-use crate::minhash::{calculate_b_and_r, compute_minhash_distance, compute_minhash_similarity, minhash_band_centroid_from_refs, minhash_centroid};
+use crate::minhash::{calculate_b_and_r, compute_minhash_distance, compute_minhash_similarity, minhash_band_centroid_from_refs, minhash_centroid, MinHashType};
 use fxhash::FxBuildHasher;
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;
@@ -26,17 +26,18 @@ gives free access to whole minhashes, and bands without sacrificing neither perf
 memory utilization.
  */
 
-struct BandKey<T: Hash + Eq> {
+
+struct BandKey<T: MinHashType> {
     v: *const T,
     len: usize,
 }
 
-unsafe impl<T: Hash + Eq> Send for BandKey<T> {}
-unsafe impl<T: Hash + Eq> Sync for BandKey<T> {}
+unsafe impl<T: MinHashType> Send for BandKey<T> {}
+unsafe impl<T: MinHashType> Sync for BandKey<T> {}
 
-impl<T: Hash + Eq> Eq for BandKey<T> {}
+impl<T: MinHashType> Eq for BandKey<T> {}
 
-impl<T: Hash + Eq> PartialEq for BandKey<T> {
+impl<T: MinHashType> PartialEq for BandKey<T> {
     fn eq(&self, other: &Self) -> bool {
         unsafe {
             for i in 0..self.len {
@@ -49,7 +50,7 @@ impl<T: Hash + Eq> PartialEq for BandKey<T> {
     }
 }
 
-impl<T: Hash + Eq> Hash for BandKey<T> {
+impl<T: MinHashType> Hash for BandKey<T> {
     fn hash<H: Hasher>(&self, state: &mut H)
     where
         T: Hash,
@@ -64,7 +65,7 @@ impl<T: Hash + Eq> Hash for BandKey<T> {
 
 struct MinHashBand<T, Id>
 where
-    T: Hash + Eq,
+    T: MinHashType,
     Id: Hash + Eq + Clone,
 {
     hash_table: FxHashMap<BandKey<T>, FxHashSet<Id>>,
@@ -75,7 +76,7 @@ where
 
 impl<T, Id> MinHashBand<T, Id>
 where
-    T: Hash + Eq,
+    T: MinHashType,
     Id: Hash + Eq + Clone,
 {
     pub fn new(band_start: isize, band_end: isize) -> Self {
@@ -306,7 +307,7 @@ where
 #[derive()]
 pub struct MinHashIndex<T, Id>
     where
-        T: Hash + Eq,
+        T: MinHashType,
         Id: Hash + Eq + Clone,
 {
     bands: Vec<MinHashBand<T, Id>>,
@@ -322,7 +323,7 @@ static REMOVED_KEYS_COUNT_CLEAN_TRIGGER: usize = 1000;
 
 impl<T, Id> fmt::Display for MinHashIndex<T, Id>
 where
-    T: Hash + Eq,
+    T: MinHashType,
     Id: Hash + Eq + Clone,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -334,7 +335,7 @@ where
 
 impl<T, Id> MinHashIndex<T, Id>
 where
-    T: Hash + Eq + Copy,
+    T: MinHashType,
     Id: Hash + Eq + Clone,
 {
     /// Create a new MinHashIndex
@@ -759,7 +760,7 @@ where
 
 impl<T, Id> QueryIndex for MinHashIndex<T, Id>
     where
-        T: Hash + Eq + Copy,
+        T: MinHashType ,
         Id: Hash + Eq + Clone {
     type Id = Id;
 
