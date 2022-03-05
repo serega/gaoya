@@ -276,7 +276,7 @@ where
 /// # Examples
 ///
 /// ```
-/// use gaoya::minhash::{MinHashIndex, MinHasher32V1, MinHasher} ;
+/// use gaoya::minhash::{MinHashIndex, MinHasher32, MinHasher} ;
 /// use gaoya::text::whitespace_split;
 /// use fxhash::FxHashSet;
 /// let corpus = [
@@ -286,7 +286,7 @@ where
 ///     "Is this the first document?",
 ///     "This not the first nor the second nor the third, but the fourth document"];
 /// let (num_bands, band_width) = (42, 3);
-/// let minhasher = MinHasher32V1::new(num_bands * band_width);
+/// let minhasher = MinHasher32::new(num_bands * band_width);
 /// let mut index = MinHashIndex::new(num_bands, band_width, 0.5);
 /// for (i, doc) in corpus.iter().enumerate() {
 ///     index.insert(i, minhasher.create_signature(whitespace_split(&doc.to_lowercase())));
@@ -608,11 +608,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use gaoya::minhash::{MinHasher,MinHasher16V1, MinHashIndex};
+    /// use gaoya::minhash::{MinHasher,MinHasher16, MinHashIndex};
     /// use gaoya::text::whitespace_split;
     ///
     /// let mut index = MinHashIndex::new(33, 3, 0.6);
-    /// let minhasher = MinHasher16V1::new(33 * 3);
+    /// let minhasher = MinHasher16::new(33 * 3);
     /// let signature1 = minhasher.create_signature(whitespace_split("This is the first minhashed document"));
     /// let signature2 = minhasher.create_signature(whitespace_split("This is the second minhashed document"));
     /// let query = signature1.clone();
