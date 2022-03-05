@@ -4,6 +4,8 @@
 This project implements Locality Sensitive Hashing algorithms and data structures for indexing and querying text documents. 
 The primary use cases for Gaoya are deduplication and clustering.
 
+* 64,32,16,8 bit minhash
+* 64,128 bit simhash
 * MinHash | SimHash
 * Powered by Rust
 * Multi-threaded
