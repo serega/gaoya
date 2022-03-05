@@ -6,6 +6,8 @@ This project implements Locality Sensitive Hashing algorithms and data structure
 The primary use cases for Gaoya are deduplication and clustering. 
 
 ## Main Features
+* 64,32,16,8 bit minhash
+* 64,128 bit simhash
 * Fast implementation in Rust
 * Multi-threaded thanks to [rayon](https://github.com/rayon-rs/rayon)
 * Python bindings
@@ -51,7 +53,7 @@ $ pip3 install gaoya
 ### Rust Example
 
 ```rust
-use gaoya::minhash::{MinHashIndex, MinHasher32V1, MinHasher} ;
+use gaoya::minhash::{MinHashIndex, MinHasher32, MinHasher} ;
 use gaoya::text::whitespace_split;
 use fxhash::FxHashSet;
 let corpus = [
@@ -61,7 +63,7 @@ let corpus = [
     "Is this the first document?",
     "This not the first nor the second nor the third, but the fourth document"];
 let (num_bands, band_width) = (42, 3);
-let minhasher = MinHasher32V1::new(num_bands * band_width);
+let minhasher = MinHasher32::new(num_bands * band_width);
 let mut index = MinHashIndex::new(num_bands, band_width, 0.5);
 for (i, doc) in corpus.iter().enumerate() {
     index.insert(i, minhasher.create_signature(whitespace_split(&doc.to_lowercase())));
