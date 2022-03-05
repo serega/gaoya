@@ -1,29 +1,29 @@
 mod hashers;
-mod min_hash16;
-mod min_hash32;
-mod min_hash64;
+mod min_hasher;
+mod min_hasher64;
 
 mod minhash_index;
 mod string_index;
 mod super_min_hash;
 
+
 pub use self::hashers::SipHasher24BuildHasher;
 pub use self::hashers::Sha1Hasher;
-pub use self::min_hash16::MinHasher16V1;
-pub use self::min_hash32::{
-    MinHasher32V1, MinHasher32V2,
-};
-pub use self::min_hash64::MinHasher64V1;
+pub use self::min_hasher64::MinHasher64V1;
+pub use self::min_hasher::MinHasher8;
+pub use self::min_hasher::MinHasher16;
+pub use self::min_hasher::MinHasher32;
 pub use self::minhash_index::MinHashIndex;
 pub use self::string_index::MinHashStringIndex;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::iter::FromIterator;
 use fxhash::FxBuildHasher;
+use num_traits::{AsPrimitive, PrimInt};
 use rayon::prelude::*;
 
 /// MinHashType can be any integer.
-pub trait MinHashType: Hash + Eq + Send + Sync + Copy {}
+pub trait MinHashType: Hash + Send + Sync + PrimInt {}
 impl MinHashType for u64 {}
 impl MinHashType for u32 {}
 impl MinHashType for u16 {}
@@ -32,6 +32,8 @@ impl MinHashType for i64 {}
 impl MinHashType for i32 {}
 impl MinHashType for i16 {}
 impl MinHashType for i8 {}
+
+
 
 
 

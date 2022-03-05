@@ -777,13 +777,14 @@ impl<T, Id> QueryIndex for MinHashIndex<T, Id>
 
 #[cfg(test)]
 mod tests {
-    use crate::minhash::min_hash64::MinHasher64V1;
-    use crate::minhash::{calculate_b_and_r, calculate_minhash_params, MinHasher, MinHasher32V1, MinHashIndex};
+    use crate::minhash::min_hasher64::MinHasher64V1;
+    use crate::minhash::{calculate_b_and_r, calculate_minhash_params, MinHasher, MinHashIndex};
     use rand::distributions::{Distribution, Uniform};
     use rand::prelude::ThreadRng;
     use rand::{thread_rng, Rng};
     use std::borrow::Borrow;
     use fxhash::FxHashSet;
+    use crate::minhash::min_hasher::MinHasher32;
     use crate::text::whitespace_split;
 
     static S1: &'static str = "local sensitive hashing is cool";
@@ -831,7 +832,7 @@ mod tests {
             "And this is the third document.",
             "Is this the first document?",
             "This not the first nor the second nor the third, but the fourth document"];
-        let minhasher = MinHasher32V1::new(42 * 3);
+        let minhasher = MinHasher32::new(42 * 3);
         let mut index = MinHashIndex::new(42, 3, 0.5);
         for (i, doc) in corpus.iter().enumerate() {
             index.insert(i, minhasher.create_signature(whitespace_split(&doc.to_lowercase())));

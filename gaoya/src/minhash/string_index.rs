@@ -1,4 +1,4 @@
-use crate::minhash::min_hash64::MinHasher64V1;
+use crate::minhash::min_hasher64::MinHasher64V1;
 use crate::minhash::{MinHasher, MinHashIndex};
 use crate::text::whitespace_split;
 use rayon::prelude::*;

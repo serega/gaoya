@@ -12,7 +12,7 @@ use std::time::Instant;
 use fxhash::FxBuildHasher;
 use gaoya::clustering::clusterer_parallel::{Clusterer, ClusterPoint, ClusterPointInner};
 
-use gaoya::minhash::{MinHasher32V2, MinHasher16V1, MinHashIndex, MinHasher32V1, MinHasher64V1, MinHasher, SipHasher24BuildHasher, calculate_minhash_params};
+use gaoya::minhash::{MinHasher32, MinHasher16, MinHashIndex, MinHasher64V1, MinHasher, SipHasher24BuildHasher, calculate_minhash_params, MinHasher8};
 use rayon::prelude::*;
 
 use itertools::Itertools;
@@ -89,19 +89,7 @@ fn main() {
     let params = (50, 5);
     println!("{:?}", params);
 
-    run_clustering(&generated_clusters, MinHasher16V1::new(params.0 * params.1), params.0, params.1, 0.6);
-    //run_clustering(&generated_clusters, MinHasher32V1::new(params.0 * params.1), params.0, params.1, 0.6);
-    //run_clustering(&generated_clusters, MinHash64V1::new(params.0 * params.1), params.0, params.1, 0.6);
-
-
-
-    // println!("\n");
-    // run_clustering(&generated_clusters, MinHash16V1::new_with_hasher(params.0 * params.1, FxBuildHasher::default()), params.0, params.1, 0.5);
-    // run_clustering(&generated_clusters, MinHash32V1::new_with_hasher(params.0 * params.1, FxBuildHasher::default()), params.0, params.1, 0.5);
-    // run_clustering(&generated_clusters, MinHash64V1::new_with_hasher(params.0 * params.1, FxBuildHasher::default()), params.0, params.1, 0.5);
-    //
-    // println!("\n");
-    // run_clustering(&generated_clusters, MinHash16V1::new_with_hasher(params.0 * params.1, SipHasher24BuildHasher::default()), params.0, params.1, 0.5);
-    // run_clustering(&generated_clusters, MinHash32V1::new_with_hasher(params.0 * params.1, SipHasher24BuildHasher::default()), params.0, params.1, 0.5);
-    // run_clustering(&generated_clusters, MinHash64V1::new_with_hasher(params.0 * params.1, SipHasher24BuildHasher::default()), params.0, params.1, 0.5);
+    run_clustering(&generated_clusters, MinHasher8::new(params.0 * params.1), params.0, params.1, 0.6);
+    run_clustering(&generated_clusters, MinHasher16::new(params.0 * params.1), params.0, params.1, 0.6);
+    run_clustering(&generated_clusters, MinHasher32::new(params.0 * params.1), params.0, params.1, 0.6);
 }

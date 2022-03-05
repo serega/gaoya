@@ -1,4 +1,4 @@
-use crate::minhash::{compute_minhash_similarity, MinHasher, MinHasher32V1};
+use crate::minhash::{compute_minhash_similarity, MinHasher};
 use rand::distributions::{Distribution, Uniform};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
