@@ -2,8 +2,8 @@ name: Create Python release windows macos
 
 on:
   push:
-    tags:
-      - '*'
+    branches:
+      - fix-windows-release
 
 jobs:
   build:
