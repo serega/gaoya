@@ -25,6 +25,31 @@ def test_minhash_32bit():
     assert index.query("1 2 3 4 5 6 8") == [2]
     assert index.query("1 2 3 4 5 6 9 10") == [2]
 
+def test_minhash_16bit():
+    index = MinHashStringIndex(16, 0.5, 30, 5)
+    index.insert_document(1, "a b c d e f")
+    index.insert_document(2, "1 2 3 4 5 6 8")
+
+    assert index.query(" a b c d e f") == [1]
+    assert index.query(" a b c d e g") == [1]
+    assert index.query("a b h g f") == []
+
+    assert index.query("1 2 3 4 5 6 8") == [2]
+    assert index.query("1 2 3 4 5 6 9 10") == [2]
+
+
+def test_minhash_8bit():
+    index = MinHashStringIndex(8, 0.5, 30, 5)
+    index.insert_document(1, "a b c d e f")
+    index.insert_document(2, "1 2 3 4 5 6 8")
+
+    assert index.query(" a b c d e f") == [1]
+    assert index.query(" a b c d e g") == [1]
+    assert index.query("a b h g f") == []
+
+    assert index.query("1 2 3 4 5 6 8") == [2]
+    assert index.query("1 2 3 4 5 6 9 10") == [2]
+
 def test_minhash_16bit_custom_analyzer():
     def split_and_uppercase(doc):
         return [token.upper() for token in doc.split(" ")]

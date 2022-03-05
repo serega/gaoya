@@ -5,7 +5,7 @@ use pyo3::{PyObjectProtocol};
 use crate::TokenizerSpecification;
 use fnv::FnvBuildHasher;
 use gaoya::minhash::{calculate_minhash_params,
-                     MinHasher, MinHasher16V1, MinHasher32V1, MinHasher64V1};
+                     MinHasher, MinHasher8, MinHasher16, MinHasher32, MinHasher64V1};
 use gaoya::text::{shingle_text, shingle_text_range, whitespace_split, MultiShingles};
 use shingles::Shingles;
 use pyo3::exceptions::PyValueError;
@@ -230,13 +230,15 @@ macro_rules! py_minhash_index {
 }
 
 py_minhash_index!(MinHash64StringIntIndex, u64, "64", MinHasher64V1, FnvBuildHasher);
-py_minhash_index!(MinHash32StringIntIndex, u32, "32", MinHasher32V1, FnvBuildHasher);
-py_minhash_index!(MinHash16StringIntIndex, u16, "16", MinHasher16V1, FnvBuildHasher);
+py_minhash_index!(MinHash32StringIntIndex, u32, "32", MinHasher32, FnvBuildHasher);
+py_minhash_index!(MinHash16StringIntIndex, u16, "16", MinHasher16, FnvBuildHasher);
+py_minhash_index!(MinHash8StringIntIndex, u8, "16", MinHasher8, FnvBuildHasher);
 
 
 pub fn init_minhash_module(m: &PyModule) -> PyResult<()> {
     m.add_class::<MinHash64StringIntIndex>()?;
     m.add_class::<MinHash32StringIntIndex>()?;
     m.add_class::<MinHash16StringIntIndex>()?;
+    m.add_class::<MinHash8StringIntIndex>()?;
     Ok(())
 }

@@ -82,8 +82,8 @@ class MinHashStringIndex:
                  analyzer='word',
                  lowercase=False,
                  ngram_range=None):
-        if hash_size not in [16, 32, 64]:
-            raise ValueError(f"Invalid hash_size {hash_size}. hash_size must be on of 16, 32 or 64")
+        if hash_size not in [8, 16, 32, 64]:
+            raise ValueError(f"Invalid hash_size {hash_size}. hash_size must be on of 8, 16, 32 or 64")
         if jaccard_threshold < 0.0 or jaccard_threshold > 1.0:
             raise ValueError(f"Jaccard threshold must be between 0 and 1")
         self.analyzer = analyzer
@@ -95,6 +95,8 @@ class MinHashStringIndex:
             self.index = m.MinHash32StringIntIndex(jaccard_threshold, num_bands, band_size, num_hashes, analyzer, lowercase, ngram_range)
         elif hash_size == 16:
             self.index = m.MinHash16StringIntIndex(jaccard_threshold, num_bands, band_size, num_hashes, analyzer, lowercase, ngram_range)
+        elif hash_size == 8:
+            self.index = m.MinHash8StringIntIndex(jaccard_threshold, num_bands, band_size, num_hashes, analyzer, lowercase, ngram_range)
         else:
             raise ValueError(f"Invalid hash size {hash_size}")
 
