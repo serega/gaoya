@@ -66,7 +66,7 @@ fn run_clustering<M: MinHasher>(generated_clusters: &Vec<GeneratedCluster>,
         match centroid_index.query_one(&signature) {
             Some(cluster_id) => {
                 let cluster = clusters.iter()
-                    .find(|cl| cl.cluster_id == *cluster_id)
+                    .find(|cl| cl.cluster_id == *cluster_id.0)
                     .unwrap();
                 let cluster_ids: HashSet<u32> = cluster.points.iter()
                     .map(|p| p.id.clone())

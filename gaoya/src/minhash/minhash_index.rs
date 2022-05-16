@@ -459,7 +459,35 @@ where
         self.id_signatures.clear();
     }
 
-    pub fn query_one(&self, query_signature: &Vec<T>) -> Option<&Id> {
+    pub fn get_signature(&self, id: &Id) -> Option<&Vec<T>> {
+        self.id_signatures.get(id)
+    }
+
+    /// Queries the index for the closest to query_signature point and returns a tuple
+    /// where the first element is the reference to id and the second is the jaccard similarity
+    /// between input signature and the signature of the returned point
+    /// Returns None if no point in the index is within the threshold.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use gaoya::minhash::{MinHasher,MinHasher16, MinHashIndex};
+    /// use gaoya::text::whitespace_split;
+    ///
+    /// let mut index = MinHashIndex::new(33, 3, 0.6);
+    /// let minhasher = MinHasher16::new(33 * 3);
+    /// let signature1 = minhasher.create_signature(["a", "b", "c", "d", "e", "f"].iter());
+    /// let signature2 = minhasher.create_signature(["a", "b", "c", "d", "e", "g"].iter());
+    /// let signature3 = minhasher.create_signature(["a", "b", "c", "d"].iter());
+    /// let query = signature1.clone();
+    /// index.insert(1u32, signature1.clone());
+    /// index.insert(3u32, signature3);
+    /// let result = index.query_one(&signature2).unwrap();
+    /// assert_eq!(*result.0, 1);
+    /// assert!(f64::abs(result.1 - 0.71) < 0.05);
+    /// ```
+
+    pub fn query_one(&self, query_signature: &Vec<T>) -> Option<(&Id, f64)> {
         let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
         for band in &self.bands {
             band.query(query_signature, &mut match_ids);
@@ -477,7 +505,7 @@ where
             .filter(|pair| pair.1 > self.threshold)
             .max_by(|x, y| x.1.partial_cmp(&y.1).unwrap());
         match best_match {
-            Some(pair) => Some(pair.0),
+            Some(pair) => Some(pair),
             None => None
         }
     }
@@ -649,6 +677,37 @@ where
         }
         removed
     }
+
+    pub fn bulk_remove(&mut self, ids: &Vec<Id>)
+        where
+            Id: Hash + Eq + Clone + Send + Sync,
+            T: Send + Sync {
+        let sigs: Vec<&Vec<T>> = ids.par_iter()
+            .filter(|id| !self.removed_ids.contains(&id))
+            .map(|id| self.id_signatures.get(&id))
+            .filter(|o| o.is_some())
+            .map(|o| o.unwrap())
+            .collect();
+
+        let band_results: Vec<Vec<bool>> = self.bands.par_iter_mut()
+            .map(|band| {
+                sigs.iter().zip(ids).map(|(sig, id)| band.remove(id, sig)).collect_vec()
+            }).collect();
+
+        for (ix, id) in ids.iter().enumerate() {
+            let fully_removed = band_results.iter()
+                .map(|b|  b[ix] as usize)
+                .sum::<usize>() == self.b;
+            if fully_removed {
+                self.id_signatures.remove(id);
+            } else {
+                self.removed_ids.insert((*id).clone());
+            }
+            self.size -= 1;
+        }
+        self.clean_removed();
+    }
+
 
     fn clean_removed(&mut self) {
         let fully_removed_ids: Vec<Id> = self
