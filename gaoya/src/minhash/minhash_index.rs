@@ -260,6 +260,13 @@ where
         }
         self.hash_table.shrink_to_fit();
     }
+
+    pub fn shrink_to(&mut self, min_capacity: usize) {
+        for item in self.hash_table.iter_mut() {
+            item.1.shrink_to_fit();
+        }
+        self.hash_table.shrink_to(min_capacity);
+    }
 }
 
 /// Data Structure to index minhashes into bands.
@@ -453,6 +460,26 @@ where
             .for_each(|band| band.shrink_to_fit());
         self.id_signatures.shrink_to_fit();
     }
+
+    pub fn shrink_to(&mut self, min_capacity: usize)
+        where Id: Send + Sync,
+              T: Send + Sync
+    {
+        if min_capacity > self.id_signatures.capacity() {
+            return;
+        }
+        self.bands.par_iter_mut()
+            .for_each(|band| {
+                // On average the size of every band will be lower than the size of
+                // id_signatures. We adjust the desired capacity.
+                let ratio = band.hash_table.len() as f64 / self.id_signatures.len() as f64;
+                assert!(ratio < 1.0);
+                let adjusted_capacity = (min_capacity as f64 * ratio) as usize;
+                band.shrink_to(adjusted_capacity)
+            });
+        self.id_signatures.shrink_to(min_capacity);
+    }
+
 
     pub fn clear(&mut self) {
         self.bands.iter_mut().for_each(|band| band.clear());
@@ -708,7 +735,6 @@ where
         self.clean_removed();
     }
 
-
     fn clean_removed(&mut self) {
         let fully_removed_ids: Vec<Id> = self
             .removed_ids
@@ -732,6 +758,10 @@ where
 
     pub fn size(&self) -> usize {
         self.size
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.id_signatures.capacity()
     }
 
     pub fn num_perms(&self) -> usize {
