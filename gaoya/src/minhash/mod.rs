@@ -110,6 +110,7 @@ pub fn compute_jaccard_distance<T, U>(iter_1: T, iter_2: T) -> f32
 /// assert!((compute_minhash_similarity(&m1, &m2) - 0.666) < 0.01);
 ///
 /// ```
+#[inline]
 pub fn compute_minhash_similarity<T>(min_hashes_1: &[T], min_hashes_2: &[T]) -> f64
     where
         T: Eq,
@@ -124,6 +125,7 @@ pub fn compute_minhash_similarity<T>(min_hashes_1: &[T], min_hashes_2: &[T]) -> 
     (matches as f64) / (num_hashes as f64)
 }
 
+#[inline]
 pub fn compute_minhash_distance<T>(min_hashes_1: &[T], min_hashes_2: &[T]) -> f64
     where
         T: Eq,

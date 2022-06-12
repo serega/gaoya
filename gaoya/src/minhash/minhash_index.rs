@@ -1,5 +1,5 @@
 use crate::minhash::{calculate_b_and_r, compute_minhash_distance, compute_minhash_similarity, minhash_band_centroid_from_refs, minhash_centroid, MinHashType};
-use fxhash::FxBuildHasher;
+use fxhash::{FxBuildHasher, FxHasher};
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;
 use rayon::prelude::*;
@@ -102,6 +102,7 @@ where
     }
 
 
+    #[inline]
     fn insert(&mut self, id: Id, signature: &Vec<T>) {
         let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
         let band_key = BandKey {
@@ -110,11 +111,12 @@ where
         };
         self.hash_table
             .entry(band_key)
-            .or_insert(FxHashSet::default())
+            .or_insert(FxHashSet::with_capacity_and_hasher(2, FxBuildHasher::default()))
             .insert(id.clone());
         ()
     }
 
+    #[inline]
     fn query<'a, S: BuildHasher>(&'a self, signature: &Vec<T>, match_ids: &mut HashSet<&'a Id, S>) {
         let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
         let band_key = BandKey {
@@ -127,6 +129,7 @@ where
         }
     }
 
+    #[inline]
     fn query_to_owned<S: BuildHasher>(&self, signature: &Vec<T>, match_ids: &mut HashSet<Id, S>) {
         let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
         let band_key = BandKey {
@@ -242,6 +245,7 @@ where
         self.hash_table.clear();
     }
 
+    #[inline]
     fn has_ids(&self, signature: &Vec<T>) -> bool {
         let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
         let band_key = BandKey {
@@ -399,7 +403,7 @@ where
     }
 
 
-
+    #[inline]
     pub fn insert(&mut self, id: Id, signature: Vec<T>) {
         for band in &mut self.bands {
             band.insert(id.clone(), &signature);
@@ -558,6 +562,7 @@ where
         match_ids
     }
 
+    #[inline]
     pub fn query_by_id(&self, id: &Id) -> HashSet<&Id, FxBuildHasher> {
         match self.id_signatures.get(id) {
             Some(signature) => self.query(signature),
@@ -565,6 +570,7 @@ where
         }
     }
 
+    #[inline]
     pub fn query_by_id_owned(&self, id: &Id) -> HashSet<Id, FxBuildHasher> {
         match self.id_signatures.get(id) {
             Some(signature) => self.query_owned(signature),
