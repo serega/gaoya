@@ -453,7 +453,6 @@ where
             self.id_signatures.insert(id_hash.0, id_hash.1);
             self.size += 1;
         }
-        self.id_signatures.shrink_to_fit();
     }
 
     pub fn shrink_to_fit(&mut self)
@@ -768,6 +767,16 @@ where
 
     pub fn capacity(&self) -> usize {
         self.id_signatures.capacity()
+    }
+
+    pub fn removed_ids_size(&self) -> usize {
+        self.removed_ids.len()
+    }
+
+    pub fn bands_sizes(&self) -> Vec<(usize, usize)> {
+        self.bands.iter()
+            .map(|band| (band.hash_table.len(), band.hash_table.capacity()))
+            .collect()
     }
 
     pub fn num_perms(&self) -> usize {
