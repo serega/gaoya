@@ -83,7 +83,7 @@ fn run_clustering<M: MinHasher>(generated_clusters: &Vec<GeneratedCluster>,
 
 
 fn main() {
-    let mut generator = ClusterGenerator::new(0.6, 200, 30, 5000, 0, 300_000, DifferenceMode::SameIndices);
+    let mut generator = ClusterGenerator::new(0.6, 200, 30, 500, 0, 300_000, DifferenceMode::SameIndices);
     let generated_clusters = generator.generate();
     println!("Generated {} clusters", generated_clusters.len());
     let params = (50, 5);
