@@ -1,7 +1,4 @@
 use crate::minhash::{calculate_b_and_r, compute_minhash_distance, compute_minhash_similarity, minhash_band_centroid_from_refs, minhash_centroid, MinHashType};
-use fxhash::{FxBuildHasher, FxHasher};
-use fxhash::FxHashMap;
-use fxhash::FxHashSet;
 use rayon::prelude::*;
 use std::any::type_name;
 use std::collections::{BinaryHeap, HashMap, HashSet};
@@ -12,6 +9,7 @@ use std::collections::hash_map::RawEntryMut;
 
 use std::fmt::{Display, Formatter};
 use std::ops::Range;
+use ahash::{AHasher, AHashMap, AHashSet};
 use itertools::Itertools;
 use crate::clustering::QueryIndex;
 
@@ -68,7 +66,7 @@ where
     T: MinHashType,
     Id: Hash + Eq + Clone,
 {
-    hash_table: FxHashMap<BandKey<T>, FxHashSet<Id>>,
+    hash_table: AHashMap<BandKey<T>, AHashSet<Id>>,
     band_start: isize,
     band_end: isize,
     len: usize,
@@ -80,7 +78,7 @@ where
     Id: Hash + Eq + Clone,
 {
     pub fn new(band_start: isize, band_end: isize) -> Self {
-        let mut hash_table = FxHashMap::default();
+        let mut hash_table = AHashMap::default();
         hash_table.reserve(1000);
         MinHashBand {
             hash_table: hash_table,
@@ -91,7 +89,7 @@ where
     }
 
     pub fn new_with_capacity(band_start: isize, band_end: isize, capacity: usize) -> Self {
-        let mut hash_table = FxHashMap::default();
+        let mut hash_table = AHashMap::default();
         hash_table.reserve(capacity);
         MinHashBand {
             hash_table: hash_table,
@@ -111,7 +109,7 @@ where
         };
         self.hash_table
             .entry(band_key)
-            .or_insert(FxHashSet::with_capacity_and_hasher(2, FxBuildHasher::default()))
+            .or_insert(AHashSet::with_capacity(2))
             .insert(id.clone());
         ()
     }
@@ -289,7 +287,7 @@ where
 /// ```
 /// use gaoya::minhash::{MinHashIndex, MinHasher32, MinHasher} ;
 /// use gaoya::text::whitespace_split;
-/// use fxhash::FxHashSet;
+/// use ahash::AHashSet;
 /// let corpus = [
 ///     "This is the first document.",
 ///     "This document is the second document.",
@@ -304,11 +302,11 @@ where
 /// }
 /// for (i, doc) in corpus.iter().enumerate() {
 ///     if i < 4 {
-///         let mut expected = FxHashSet::default();
+///         let mut expected = AHashSet::default();
 ///         expected.extend(vec![0, 1, 2, 3].into_iter());
 ///         assert_eq!(index.query_owned(&minhasher.create_signature(whitespace_split(&doc.to_lowercase()))), expected);
 ///     } else {
-///         let mut expected = FxHashSet::default();
+///         let mut expected = AHashSet::default();
 ///         expected.insert(4);
 ///         assert_eq!(index.query_owned(&minhasher.create_signature(whitespace_split(&doc.to_lowercase()))), expected);
 ///     }
@@ -323,7 +321,7 @@ pub struct MinHashIndex<T, Id>
 {
     bands: Vec<MinHashBand<T, Id>>,
     removed_ids: HashSet<Id>,
-    id_signatures: FxHashMap<Id, Vec<T>>,
+    id_signatures: AHashMap<Id, Vec<T>>,
     threshold: f64,
     r: usize,
     b: usize,
@@ -356,7 +354,7 @@ where
             let (start, end) = (i * band_width, (i + 1) * band_width);
             bands.push(MinHashBand::<T, Id>::new(start as isize, end as isize));
         }
-        let mut hash_table = FxHashMap::default();
+        let mut hash_table = AHashMap::default();
         hash_table.reserve(1000);
         MinHashIndex {
             bands: bands,
@@ -376,7 +374,7 @@ where
             let (start, end) = (i * band_width, (i + 1) * band_width);
             bands.push(MinHashBand::<T, Id>::new_with_capacity(start as isize, end as isize, initial_capacity));
         }
-        let mut hash_table = FxHashMap::default();
+        let mut hash_table = AHashMap::default();
         hash_table.reserve(initial_capacity);
         MinHashIndex {
             bands: bands,
@@ -518,7 +516,7 @@ where
     /// ```
 
     pub fn query_one(&self, query_signature: &Vec<T>) -> Option<(&Id, f64)> {
-        let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
+        let mut match_ids = AHashSet::with_capacity(10);
         for band in &self.bands {
             band.query(query_signature, &mut match_ids);
         }
@@ -540,11 +538,11 @@ where
         }
     }
 
-    pub fn query(&self, query_signature: &Vec<T>) -> HashSet<&Id, FxBuildHasher>
+    pub fn query(&self, query_signature: &Vec<T>) -> AHashSet<&Id>
     where
         Id: Hash + Eq + Clone,
     {
-        let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
+        let mut match_ids = AHashSet::with_capacity(10);
         for band in &self.bands {
             band.query(query_signature, &mut match_ids);
         }
@@ -562,26 +560,26 @@ where
     }
 
     #[inline]
-    pub fn query_by_id(&self, id: &Id) -> HashSet<&Id, FxBuildHasher> {
+    pub fn query_by_id(&self, id: &Id) -> AHashSet<&Id> {
         match self.id_signatures.get(id) {
             Some(signature) => self.query(signature),
-            None => HashSet::default()
+            None => AHashSet::new()
         }
     }
 
     #[inline]
-    pub fn query_by_id_owned(&self, id: &Id) -> HashSet<Id, FxBuildHasher> {
+    pub fn query_by_id_owned(&self, id: &Id) -> AHashSet<Id> {
         match self.id_signatures.get(id) {
             Some(signature) => self.query_owned(signature),
-            None => HashSet::default()
+            None => AHashSet::new()
         }
     }
 
-    pub fn query_owned(&self, query_signature: &Vec<T>) -> HashSet<Id, FxBuildHasher>
+    pub fn query_owned(&self, query_signature: &Vec<T>) -> AHashSet<Id>
     where
         Id: Hash + Eq + Clone,
     {
-        let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
+        let mut match_ids = AHashSet::with_capacity(10);
         for band in &self.bands {
             band.query_to_owned(query_signature, &mut match_ids);
         }
@@ -595,7 +593,7 @@ where
         match_ids
     }
 
-    pub fn par_bulk_query(&self, signatures: &Vec<Vec<T>>) -> Vec<HashSet<Id, FxBuildHasher>>
+    pub fn par_bulk_query(&self, signatures: &Vec<Vec<T>>) -> Vec<AHashSet<Id>>
         where
             Id: Hash + Eq + Clone + Send + Sync,
             T: Send + Sync
@@ -620,7 +618,7 @@ where
         where
             Id: Hash + Eq + Clone,
     {
-        let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
+        let mut match_ids = AHashSet::with_capacity(10);
         for band in &self.bands {
             band.query_to_owned(query_signature, &mut match_ids);
         }
@@ -642,7 +640,7 @@ where
 
 
     pub fn query_top_k(&self, query_signature: &Vec<T>, k: usize) -> Vec<(Id, f64)> {
-        let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
+        let mut match_ids = AHashSet::with_capacity(10);
         for band in &self.bands {
             band.query_to_owned(query_signature, &mut match_ids);
         }
@@ -668,6 +666,7 @@ where
     /// # Examples
     ///
     /// ```
+    /// use ahash::AHasher;
     /// use gaoya::minhash::{MinHasher,MinHasher16, MinHashIndex};
     /// use gaoya::text::whitespace_split;
     ///
@@ -678,7 +677,9 @@ where
     /// let query = signature1.clone();
     /// index.insert(1u32, signature1);
     /// index.insert(2u32, signature2);
-    /// assert_eq!(index.query_owned(&query).into_iter().collect::<Vec<_>>(), vec![1,2]);
+    /// let mut result =  index.query_owned(&query).into_iter().collect::<Vec<_>>();
+    /// result.sort();
+    /// assert_eq!(result, vec![1, 2]);
     /// assert_eq!(index.remove(&1), true);
     /// assert_eq!(index.remove(&1), false);
     /// ```
@@ -868,12 +869,12 @@ impl<T, Id> QueryIndex for MinHashIndex<T, Id>
         Id: Hash + Eq + Clone {
     type Id = Id;
 
-    fn query(&self, id: &Self::Id) -> HashSet<&Self::Id, FxBuildHasher> {
+    fn query(&self, id: &Self::Id) -> AHashSet<&Self::Id> {
         match self.id_signatures.get(id) {
             Some(signature) => {
                 self::MinHashIndex::query(self, signature)
             }
-            None => HashSet::default()
+            None => AHashSet::new()
         }
     }
 }
@@ -887,7 +888,7 @@ mod tests {
     use rand::prelude::ThreadRng;
     use rand::{thread_rng, Rng};
     use std::borrow::Borrow;
-    use fxhash::FxHashSet;
+    use ahash::AHashSet;
     use crate::minhash::min_hasher::MinHasher32;
     use crate::text::whitespace_split;
 
@@ -943,11 +944,11 @@ mod tests {
         }
         for (i, doc) in corpus.iter().enumerate() {
             if i < 4 {
-                let mut expected = FxHashSet::default();
+                let mut expected = AHashSet::default();
                 expected.extend(vec![0, 1, 2, 3].into_iter());
                 assert_eq!(index.query_owned(&minhasher.create_signature(whitespace_split(&doc.to_lowercase()))), expected);
             } else {
-                let mut expected = FxHashSet::default();
+                let mut expected = AHashSet::default();
                 expected.insert(4);
                 assert_eq!(index.query_owned(&minhasher.create_signature(whitespace_split(&doc.to_lowercase()))), expected);
             }

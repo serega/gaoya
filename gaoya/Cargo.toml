@@ -22,12 +22,12 @@ path = "src/lib.rs"
 bench = false
 
 [dependencies]
+ahash = "0.7.6"
 rand = "0.8.4"
 rand_pcg = "0.3.1"
 sha-1 = "0.9.8"
 siphasher = "0.3.7"
 random_choice = "0.3.2"
-fxhash = "0.2.1"
 rayon = "1.5.1"
 seahash = "4.1.0"
 itertools = "0.10.1"

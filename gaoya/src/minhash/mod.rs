@@ -18,7 +18,6 @@ pub use self::string_index::MinHashStringIndex;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::iter::FromIterator;
-use fxhash::FxBuildHasher;
 use num_traits::{AsPrimitive, PrimInt};
 use rayon::prelude::*;
 
