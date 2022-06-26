@@ -1161,7 +1161,7 @@ mod tests {
     #[test]
     pub fn test_lsh_index_batch_construction2() {
         let (b, r) = calculate_minhash_params(0.5, 128);
-        let min_hash = MinHasher64V1::new(128);
+        let min_hash = MinHasher64V1::new(b * r);
         let mut lsh_index: MinHashIndex<u64, u64> = MinHashIndex::new(b, r, 0.5);
 
         let mut vecs = Vec::new();
