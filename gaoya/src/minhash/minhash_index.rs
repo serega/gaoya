@@ -790,16 +790,6 @@ where
         self.id_signatures.capacity()
     }
 
-    pub fn removed_ids_size(&self) -> usize {
-        self.removed_ids.len()
-    }
-
-    pub fn bands_sizes(&self) -> Vec<(usize, usize)> {
-        self.bands.iter()
-            .map(|band| (band.hash_table.len(), band.hash_table.capacity()))
-            .collect()
-    }
-
     pub fn num_perms(&self) -> usize {
         self.b * self.r
     }
