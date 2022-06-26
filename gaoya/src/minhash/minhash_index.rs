@@ -1,4 +1,6 @@
-use crate::minhash::{calculate_b_and_r, compute_minhash_distance, compute_minhash_similarity, minhash_band_centroid_from_refs, minhash_centroid, MinHashType};
+use crate::minhash::{calculate_b_and_r, compute_minhash_distance, compute_minhash_similarity,
+                     minhash_band_centroid_from_refs, minhash_centroid, MinHashType
+};
 use rayon::prelude::*;
 use std::any::type_name;
 use std::collections::{BinaryHeap, HashMap, HashSet};
@@ -342,6 +344,7 @@ pub struct MinHashIndex<T, Id>
     threshold: f64,
     r: usize,
     b: usize,
+    num_hashes: usize,
     size: usize,
 }
 
@@ -381,6 +384,7 @@ where
             id_signatures: hash_table,
             b: num_bands,
             r: band_width,
+            num_hashes: num_bands * band_width,
             size: 0,
         }
     }
@@ -402,6 +406,7 @@ where
             id_signatures: hash_table,
             b: num_bands,
             r: band_width,
+            num_hashes: num_bands * band_width,
             size: 0,
         }
     }
@@ -422,6 +427,7 @@ where
 
     #[inline]
     pub fn insert(&mut self, id: Id, signature: Vec<T>) {
+        assert_eq!(self.num_hashes(), signature.len());
         for band in &mut self.bands {
             band.insert(id.clone(), &signature);
         }
@@ -434,6 +440,9 @@ where
         Id: Hash + Eq + Clone + Send + Sync,
         T: Send + Sync,
     {
+        if signatures.len() > 0 {
+            assert_eq!(self.num_hashes(), signatures[0].len());
+        }
         unsafe {
             self.bands.par_iter_mut().for_each(|band| {
                 for item in signatures.iter().zip(ids.iter()) {
@@ -535,6 +544,7 @@ where
     /// ```
 
     pub fn query_one(&self, query_signature: &Vec<T>) -> Option<(&Id, f64)> {
+        assert_eq!(self.num_hashes(), query_signature.len());
         let mut match_ids = AHashSet::with_capacity(10);
         for band in &self.bands {
             band.query(query_signature, &mut match_ids);
@@ -561,6 +571,7 @@ where
     where
         Id: Hash + Eq + Clone,
     {
+        assert_eq!(self.num_hashes(), query_signature.len());
         let mut match_ids = AHashSet::with_capacity(10);
         for band in &self.bands {
             band.query(query_signature, &mut match_ids);
@@ -598,6 +609,7 @@ where
     where
         Id: Hash + Eq + Clone,
     {
+        assert_eq!(self.num_hashes(), query_signature.len());
         let mut match_ids = AHashSet::with_capacity(10);
         for band in &self.bands {
             band.query_to_owned(query_signature, &mut match_ids);
@@ -789,8 +801,8 @@ where
         self.id_signatures.capacity()
     }
 
-    pub fn num_perms(&self) -> usize {
-        self.b * self.r
+    pub fn num_hashes(&self) -> usize {
+        self.num_hashes
     }
 
     /// This method filters candidates by measuring similarity between query_minhash and
