@@ -12,7 +12,6 @@ use std::marker::PhantomData;
 use std::ops::Range;
 use ahash::{AHasher, AHashMap, AHashSet, RandomState};
 use itertools::Itertools;
-use nohash_hasher::{BuildNoHashHasher, NoHashHasher};
 use crate::clustering::QueryIndex;
 
 
