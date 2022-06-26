@@ -8,68 +8,102 @@ use std::{fmt, slice};
 use std::collections::hash_map::RawEntryMut;
 
 use std::fmt::{Display, Formatter};
+use std::marker::PhantomData;
 use std::ops::Range;
-use ahash::{AHasher, AHashMap, AHashSet};
+use ahash::{AHasher, AHashMap, AHashSet, RandomState};
 use itertools::Itertools;
+use nohash_hasher::{BuildNoHashHasher, NoHashHasher};
 use crate::clustering::QueryIndex;
 
 
 
-/*
-MinHashIndex stores all minhashes as Vec<T> in a hashmap, and uses unsafe pointer arithmetic
-to access the band portion of the minhash directly in the vector.
-
-Having full simhashes is useful for computing a centroid of a cluster. The unsafe data structure
-gives free access to whole minhashes, and bands without sacrificing neither performance nor
-memory utilization.
- */
-
-
-struct BandKey<T: MinHashType> {
-    v: *const T,
-    len: usize,
+/// BandKey contains the hash of the band.
+/// Using the hash of the band instead of the whole band slice will not decrease
+/// recall. Banding provides candidates, which then are compared with the search query using full
+/// minhash-jaccard similarity
+struct BandKey {
+    pub hash: u64
 }
 
-unsafe impl<T: MinHashType> Send for BandKey<T> {}
-unsafe impl<T: MinHashType> Sync for BandKey<T> {}
+impl BandKey {
 
-impl<T: MinHashType> Eq for BandKey<T> {}
-
-impl<T: MinHashType> PartialEq for BandKey<T> {
-    fn eq(&self, other: &Self) -> bool {
-        unsafe {
-            for i in 0..self.len {
-                if *self.v.add(i) != *other.v.add(i) {
-                    return false;
-                }
-            }
-            return true;
-        };
-    }
-}
-
-impl<T: MinHashType> Hash for BandKey<T> {
-    fn hash<H: Hasher>(&self, state: &mut H)
-    where
-        T: Hash,
-    {
-        unsafe {
-            for i in 0..self.len {
-                (*self.v.add(i)).hash(state)
-            }
+    #[inline]
+    pub fn new<T: MinHashType>(band: &[T], mut hasher: AHasher) -> Self {
+        band.hash(&mut hasher);
+        Self {
+            hash:  hasher.finish()
         }
     }
 }
+
+impl Hash for BandKey {
+
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u64(self.hash)
+    }
+}
+
+impl Eq for BandKey {}
+
+impl PartialEq for BandKey {
+
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash
+    }
+}
+
+/// Because we hash the band slice in the BandKey using AHash we don't need
+/// to hash the hash in the hashmap.
+struct NoOpHasher {
+    pub hash: u64
+}
+
+impl Hasher for NoOpHasher {
+
+    #[inline]
+    fn finish(&self) -> u64 {
+        debug_assert!(self.hash > 0);
+        self.hash
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        panic!("Should not have been called");
+    }
+
+    #[inline]
+    fn write_u64(&mut self, h: u64) {
+        // h is the BandKey.hash
+        self.hash = h;
+    }
+}
+
+struct NoOpHashBuilder {}
+
+impl BuildHasher for NoOpHashBuilder {
+    type Hasher = NoOpHasher;
+
+    #[inline]
+    fn build_hasher(&self) -> Self::Hasher {
+        NoOpHasher {hash: 0}
+    }
+
+}
+
 
 struct MinHashBand<T, Id>
 where
     T: MinHashType,
     Id: Hash + Eq + Clone,
 {
-    hash_table: AHashMap<BandKey<T>, AHashSet<Id>>,
-    band_start: isize,
-    band_end: isize,
+    hash_table: HashMap<BandKey, AHashSet<Id>, NoOpHashBuilder>,
+    band_start: usize,
+    band_end: usize,
     len: usize,
+    build_ahash: RandomState,
+    phantom: PhantomData<T>,
+
 }
 
 impl<T, Id> MinHashBand<T, Id>
@@ -77,36 +111,40 @@ where
     T: MinHashType,
     Id: Hash + Eq + Clone,
 {
-    pub fn new(band_start: isize, band_end: isize) -> Self {
-        let mut hash_table = AHashMap::default();
+    pub fn new(band_start: usize, band_end: usize, build_ahash: RandomState) -> Self {
+        let mut hash_table = HashMap::with_hasher(NoOpHashBuilder {});
         hash_table.reserve(1000);
         MinHashBand {
             hash_table: hash_table,
             band_start: band_start,
             band_end: band_end,
             len: (band_end - band_start) as usize,
+            build_ahash: build_ahash,
+            phantom: PhantomData
         }
     }
 
-    pub fn new_with_capacity(band_start: isize, band_end: isize, capacity: usize) -> Self {
-        let mut hash_table = AHashMap::default();
+    pub fn new_with_capacity(band_start: usize,
+                             band_end: usize,
+                             capacity: usize,
+                             build_ahash: RandomState) -> Self {
+        let mut hash_table = HashMap::with_hasher(NoOpHashBuilder {});
         hash_table.reserve(capacity);
         MinHashBand {
             hash_table: hash_table,
             band_start: band_start,
             band_end: band_end,
             len: (band_end - band_start) as usize,
+            build_ahash: build_ahash,
+            phantom: PhantomData
         }
     }
 
 
     #[inline]
     fn insert(&mut self, id: Id, signature: &Vec<T>) {
-        let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
-        let band_key = BandKey {
-            v: band_data,
-            len: self.len,
-        };
+        let band_data = &signature[self.band_start..self.band_end];
+        let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
         self.hash_table
             .entry(band_key)
             .or_insert(AHashSet::with_capacity(2))
@@ -116,11 +154,8 @@ where
 
     #[inline]
     fn query<'a, S: BuildHasher>(&'a self, signature: &Vec<T>, match_ids: &mut HashSet<&'a Id, S>) {
-        let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
-        let band_key = BandKey {
-            v: band_data,
-            len: self.len,
-        };
+        let band_data = &signature[self.band_start..self.band_end];
+        let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
         match self.hash_table.get(&band_key) {
             Some(ids) => match_ids.extend(ids.iter()),
             None => (),
@@ -129,11 +164,8 @@ where
 
     #[inline]
     fn query_to_owned<S: BuildHasher>(&self, signature: &Vec<T>, match_ids: &mut HashSet<Id, S>) {
-        let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
-        let band_key = BandKey {
-            v: band_data,
-            len: self.len,
-        };
+        let band_data = &signature[self.band_start..self.band_end];
+        let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
         match self.hash_table.get(&band_key) {
             Some(ids) => {
                 match_ids.extend(ids.iter().cloned());
@@ -154,10 +186,8 @@ where
         let mut max_count: usize = 0;
         let mut best_index: isize = -1;
         for minhash in signatures.iter().enumerate() {
-            let band_key = BandKey {
-                v: minhash.1.as_ptr(),
-                len: self.len,
-            };
+            let band_data = &minhash.1[self.band_start..self.band_end];
+            let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
             match self.hash_table.get(&band_key) {
                 Some(ids) => {
                     let new_count = ids.iter()
@@ -171,10 +201,8 @@ where
                 None => (),
             }
         }
-        let band_key = BandKey {
-            v: signatures[best_index as usize].as_ptr(),
-            len: self.len,
-        };
+        let band_data = &signatures[best_index as usize][self.band_start..self.band_end];
+        let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
         match self.hash_table.get(&band_key) {
             Some(ids) => {
                 all_ids.extend(ids.iter())
@@ -192,12 +220,8 @@ where
     /// Returns true if the band portion of the signature is not in the hashtable
     #[cfg(not(feature = "unstable"))]
     fn remove(&mut self, id: &Id, signature: &Vec<T>) -> bool {
-        let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
-        let band_key = BandKey {
-            v: band_data,
-            len: (self.band_end - self.band_start) as usize,
-        };
-
+        let band_data = &signature[self.band_start..self.band_end];
+        let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
         match self.hash_table.get_mut(&band_key) {
             Some(ids) => {
                 ids.remove(id);
@@ -218,12 +242,8 @@ where
     /// HashMap::raw_entry_mut() to compare the pointers of bands
     #[cfg(all(feature = "unstable"))]
     fn remove(&mut self, id: &Id, signature: &Vec<T>) -> bool {
-        let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
-        let band_key = BandKey {
-            v: band_data,
-            len: (self.band_end - self.band_start) as usize,
-        };
-
+        let band_data = &signature[self.band_start..self.band_end];
+        let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
         match self.hash_table.raw_entry_mut().from_key(&band_key) {
             RawEntryMut::Occupied(mut entry) => {
                 let mut ids = entry.get_mut();
@@ -245,11 +265,9 @@ where
 
     #[inline]
     fn has_ids(&self, signature: &Vec<T>) -> bool {
-        let band_data = unsafe { signature.as_ptr().offset(self.band_start) };
-        let band_key = BandKey {
-            v: band_data,
-            len: (self.band_end - self.band_start) as usize,
-        };
+        let band_data = &signature[self.band_start as usize..self.band_end as usize];
+        let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
+
         match self.hash_table.get(&band_key) {
             Some(ids) => ids.len() > 0,
             None => false,
@@ -349,10 +367,11 @@ where
 {
     /// Create a new MinHashIndex
     pub fn new(num_bands: usize, band_width: usize, jaccard_threshold: f64) -> Self {
+        let build_hasher = RandomState::new();
         let mut bands = Vec::new();
         for i in 0..num_bands {
             let (start, end) = (i * band_width, (i + 1) * band_width);
-            bands.push(MinHashBand::<T, Id>::new(start as isize, end as isize));
+            bands.push(MinHashBand::<T, Id>::new(start, end, build_hasher.clone()));
         }
         let mut hash_table = AHashMap::default();
         hash_table.reserve(1000);
@@ -370,9 +389,10 @@ where
     pub fn new_with_capacity(num_bands: usize, band_width: usize,
                              jaccard_threshold: f64, initial_capacity: usize) -> Self {
         let mut bands = Vec::new();
+        let build_hasher = RandomState::new();
         for i in 0..num_bands {
             let (start, end) = (i * band_width, (i + 1) * band_width);
-            bands.push(MinHashBand::<T, Id>::new_with_capacity(start as isize, end as isize, initial_capacity));
+            bands.push(MinHashBand::<T, Id>::new_with_capacity(start, end, initial_capacity, build_hasher.clone()));
         }
         let mut hash_table = AHashMap::default();
         hash_table.reserve(initial_capacity);
