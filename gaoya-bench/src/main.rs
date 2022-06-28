@@ -41,7 +41,10 @@ fn run_clustering<M: MinHasher>(generated_clusters: &Vec<GeneratedCluster>,
     lsh.par_bulk_insert(ids, hashes);
     println!("Starting clustering {}", lsh);
     let clusterer = Clusterer::<u32>::new(50, 10);
-    let mut points: Vec<ClusterPoint<u32>> = lsh.get_keys();
+    let mut points: Vec<ClusterPoint<u32>> = lsh.get_id_signature_map()
+        .keys()
+        .map(|key| key.clone())
+        .collect();
     let now = Instant::now();
     let clusters = clusterer.cluster_par(&mut points, &lsh);
     let elapsed = now.elapsed();

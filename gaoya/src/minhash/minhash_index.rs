@@ -376,17 +376,10 @@ where
         }
     }
 
-    pub fn get_keys(&self) -> Vec<Id> {
-        self.bands[0].hash_table.values()
-            .into_iter().flat_map(|s| s.iter())
-            .map(|id| id.clone())
-            .collect()
-    }
 
-    pub fn get_keys_refs(&self) -> Vec<&Id> {
-        self.bands[0].hash_table.values()
-            .into_iter().flat_map(|s| s.iter())
-            .collect()
+    /// Returns a reference to the map containing all inserted points
+    pub fn get_id_signature_map(&self) -> &AHashMap<Id, Vec<T>> {
+        &self.id_signatures
     }
 
 
@@ -1009,5 +1002,12 @@ mod tests {
         let ret = lsh_index.query(&min_hash.create_signature(v3.iter()));
         assert_eq!(ret.len(), 100);
         assert_eq!((200..300).filter(|i| ret.contains(&i)).count(), 100);
+
+        let removed_ids: Vec<u64> = (0..100).step_by(2).collect();
+        lsh_index.bulk_remove(&removed_ids);
+        let ret = lsh_index.query(&min_hash.create_signature(v1.iter()));
+        assert_eq!(ret.len(), 50);
+        //assert_eq!((0..100).filter(|i| ret.contains(&i)).count(), 100);
+
     }
 }
