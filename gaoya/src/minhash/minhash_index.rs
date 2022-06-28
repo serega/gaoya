@@ -219,8 +219,7 @@ where
 
     /// Removes id from the band
     /// Returns true if the band portion of the signature is not in the hashtable
-    #[cfg(not(feature = "unstable"))]
-    fn remove(&mut self, id: &Id, signature: &Vec<T>) -> bool {
+    fn remove(&mut self, id: &Id, signature: &Vec<T>) {
         let band_data = &signature[self.band_start..self.band_end];
         let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
         match self.hash_table.get_mut(&band_key) {
@@ -228,35 +227,9 @@ where
                 ids.remove(id);
                 if ids.is_empty() {
                     self.hash_table.remove(&band_key);
-                    true
-                } else {
-                    false
                 }
             }
-            None => false,
-        }
-    }
-
-    /// Removes id from the band
-    /// Returns true if the band portion of the signature is not in the hashtable
-    /// This method currently only compiles on nightly channel because it relies on
-    /// HashMap::raw_entry_mut() to compare the pointers of bands
-    #[cfg(all(feature = "unstable"))]
-    fn remove(&mut self, id: &Id, signature: &Vec<T>) -> bool {
-        let band_data = &signature[self.band_start..self.band_end];
-        let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
-        match self.hash_table.raw_entry_mut().from_key(&band_key) {
-            RawEntryMut::Occupied(mut entry) => {
-                let mut ids = entry.get_mut();
-                ids.remove(id);
-                if ids.is_empty() {
-                    entry.remove();
-                    true
-                } else {
-                    !std::ptr::eq(entry.key().v, band_key.v)
-                }
-            }
-            RawEntryMut::Vacant(entry) => false
+            None => (),
         }
     }
 
@@ -339,16 +312,12 @@ pub struct MinHashIndex<T, Id>
         Id: Hash + Eq + Clone,
 {
     bands: Vec<MinHashBand<T, Id>>,
-    removed_ids: HashSet<Id>,
     id_signatures: AHashMap<Id, Vec<T>>,
     threshold: f64,
     r: usize,
     b: usize,
-    num_hashes: usize,
-    size: usize,
+    num_hashes: usize
 }
-
-static REMOVED_KEYS_COUNT_CLEAN_TRIGGER: usize = 1000;
 
 impl<T, Id> fmt::Display for MinHashIndex<T, Id>
 where
@@ -358,7 +327,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "MinHashIndex<{}> {{ threshold = {}, num_hashes = {}, bands = {}, rows_per_band = {}, size = {} }}",
                type_name::<T>(),
-               self.threshold, self.b * self.r, self.b, self.r, self.size)
+               self.threshold, self.b * self.r, self.b, self.r, self.size())
     }
 }
 
@@ -379,13 +348,11 @@ where
         hash_table.reserve(1000);
         MinHashIndex {
             bands: bands,
-            removed_ids: HashSet::new(),
             threshold: jaccard_threshold,
             id_signatures: hash_table,
             b: num_bands,
             r: band_width,
             num_hashes: num_bands * band_width,
-            size: 0,
         }
     }
 
@@ -401,13 +368,11 @@ where
         hash_table.reserve(initial_capacity);
         MinHashIndex {
             bands: bands,
-            removed_ids: HashSet::new(),
             threshold: jaccard_threshold,
             id_signatures: hash_table,
             b: num_bands,
             r: band_width,
             num_hashes: num_bands * band_width,
-            size: 0,
         }
     }
 
@@ -432,7 +397,6 @@ where
             band.insert(id.clone(), &signature);
         }
         self.id_signatures.insert(id, signature);
-        self.size += 1;
     }
 
     pub fn par_bulk_insert(&mut self, ids: Vec<Id>, signatures: Vec<Vec<T>>)
@@ -453,10 +417,7 @@ where
             });
         }
         for id_hash in ids.into_iter().zip(signatures.into_iter()) {
-            match self.id_signatures.insert(id_hash.0, id_hash.1) {
-                None => self.size += 1,
-                Some(_) => ()
-            }
+            self.id_signatures.insert(id_hash.0, id_hash.1);
         }
     }
 
@@ -477,7 +438,6 @@ where
         }
         for id_hash in id_signature_pairs {
             self.id_signatures.insert(id_hash.0, id_hash.1);
-            self.size += 1;
         }
     }
 
@@ -550,10 +510,6 @@ where
             band.query(query_signature, &mut match_ids);
         }
 
-        if self.removed_ids.len() > 0 {
-            match_ids.retain(|item| !self.removed_ids.contains(item));
-        }
-
         let best_match = match_ids.into_iter()
             .map(|id| {
                 let signature = &self.id_signatures[id];
@@ -567,24 +523,18 @@ where
         }
     }
 
-    pub fn query(&self, query_signature: &Vec<T>) -> AHashSet<&Id>
-    where
-        Id: Hash + Eq + Clone,
-    {
+    pub fn query(&self, query_signature: &Vec<T>) -> AHashSet<&Id> {
         assert_eq!(self.num_hashes(), query_signature.len());
         let mut match_ids = AHashSet::with_capacity(10);
         for band in &self.bands {
             band.query(query_signature, &mut match_ids);
         }
 
-        if self.removed_ids.len() > 0 {
-            match_ids.retain(|item| !self.removed_ids.contains(item));
-        }
-
         match_ids.retain(|id| {
             let signature = &self.id_signatures[id];
             compute_minhash_similarity(signature, query_signature) >= self.threshold
-        });
+            }
+        );
 
         match_ids
     }
@@ -613,9 +563,6 @@ where
         let mut match_ids = AHashSet::with_capacity(10);
         for band in &self.bands {
             band.query_to_owned(query_signature, &mut match_ids);
-        }
-        if self.removed_ids.len() > 0 {
-            match_ids.retain(|item| !self.removed_ids.contains(item));
         }
         match_ids.retain(|id| {
             let signature = &self.id_signatures[id];
@@ -653,9 +600,6 @@ where
         for band in &self.bands {
             band.query_to_owned(query_signature, &mut match_ids);
         }
-        if self.removed_ids.len() > 0 {
-            match_ids.retain(|item| !self.removed_ids.contains(item));
-        }
         let mut result = Vec::new();
         for id in match_ids.into_iter() {
             let signature = &self.id_signatures[&id];
@@ -674,9 +618,6 @@ where
         let mut match_ids = AHashSet::with_capacity(10);
         for band in &self.bands {
             band.query_to_owned(query_signature, &mut match_ids);
-        }
-        if self.removed_ids.len() > 0 {
-            match_ids.retain(|item| !self.removed_ids.contains(item));
         }
         let mut ids_distances: Vec<(Id, f64)> = match_ids
             .into_iter()
@@ -717,28 +658,15 @@ where
     pub fn remove(&mut self, id: &Id) -> bool {
         let removed = match self.id_signatures.get(id) {
             Some(hashes) => {
-                if self.removed_ids.contains(id) {
-                    return false;
-                }
-                let fully_removed = self
+                self
                     .bands
                     .iter_mut()
-                    .map(|band| band.remove(id, hashes) as usize)
-                    .sum::<usize>()
-                    == self.b;
-                if fully_removed {
-                    self.id_signatures.remove(id);
-                } else {
-                    self.removed_ids.insert(id.clone());
-                }
-                self.size -= 1;
+                    .for_each(|band| band.remove(id, hashes));
+                self.id_signatures.remove(id);
                 true
             }
             None => false,
         };
-        if removed && self.removed_ids.len() > REMOVED_KEYS_COUNT_CLEAN_TRIGGER {
-            self.clean_removed();
-        }
         removed
     }
 
@@ -746,55 +674,21 @@ where
         where
             Id: Hash + Eq + Clone + Send + Sync,
             T: Send + Sync {
-        let sigs: Vec<&Vec<T>> = ids.par_iter()
-            .filter(|id| !self.removed_ids.contains(&id))
-            .map(|id| self.id_signatures.get(&id))
+        let sigs: Vec<Vec<T>> = ids.iter()
+            .map(|id| self.id_signatures.remove(&id))
             .filter(|o| o.is_some())
             .map(|o| o.unwrap())
             .collect();
 
-        let band_results: Vec<Vec<bool>> = self.bands.par_iter_mut()
+        self.bands.par_iter_mut()
             .map(|band| {
-                sigs.iter().zip(ids).map(|(sig, id)| band.remove(id, sig)).collect_vec()
-            }).collect();
-
-        for (ix, id) in ids.iter().enumerate() {
-            let fully_removed = band_results.iter()
-                .map(|b|  b[ix] as usize)
-                .sum::<usize>() == self.b;
-            if fully_removed {
-                self.id_signatures.remove(id);
-            } else {
-                self.removed_ids.insert((*id).clone());
-            }
-            self.size -= 1;
-        }
-        self.clean_removed();
-    }
-
-    fn clean_removed(&mut self) {
-        let fully_removed_ids: Vec<Id> = self
-            .removed_ids
-            .iter()
-            .filter(|id| {
-                let signature = self.id_signatures.get(id).unwrap();
-                self.bands
-                    .iter()
-                    .filter(|band| band.has_ids(signature))
-                    .count()
-                    == 0
-            })
-            .map(|id| id.clone())
-            .collect();
-
-        for id in fully_removed_ids {
-            self.removed_ids.remove(&id);
-            self.id_signatures.remove(&id);
-        }
+                sigs.iter().zip(ids)
+                    .for_each(|(sig, id)| band.remove(&id, sig))
+            });
     }
 
     pub fn size(&self) -> usize {
-        self.size
+        self.id_signatures.len()
     }
 
     pub fn capacity(&self) -> usize {
@@ -872,9 +766,7 @@ where
                     centroid_signature.extend_from_slice(&first_signature[self.band_range(i)]);
                 }
             }
-
         }
-
         centroid_signature
     }
 
@@ -933,7 +825,7 @@ mod tests {
         lsh_index.insert(6, min_hash.create_signature(S6.split_whitespace()));
 
         println!("{}", lsh_index);
-        assert_eq!(lsh_index.size, 6);
+        assert_eq!(lsh_index.size(), 6);
         let ret = lsh_index.query(&min_hash.create_signature(S2.split_whitespace()));
 
         let ret_str: String = ret.iter().map(|x| x.to_string()).collect();
@@ -943,7 +835,7 @@ mod tests {
         assert!(ret.contains(&3));
 
         lsh_index.remove(&2);
-        assert_eq!(lsh_index.size, 5);
+        assert_eq!(lsh_index.size(), 5);
         let ret = lsh_index.query(&min_hash.create_signature(S2.split_whitespace()));
         assert_eq!(ret.len(), 2);
         assert!(ret.contains(&1));
@@ -977,71 +869,6 @@ mod tests {
 
     }
 
-    #[cfg(all(feature = "unstable"))]
-    #[test]
-    pub fn test_remove() {
-        let mut lsh_index = MinHashIndex::new(4, 2, 0.5);
-        lsh_index.insert(1, vec![1, 1,  1, 1,  1, 1,  1, 1]);
-        lsh_index.insert(2, vec![1, 1,  1, 1,  1, 1,  1, 1]);
-
-        lsh_index.insert(3, vec![1, 1,  1, 1,  1, 1,  2, 2]);
-        lsh_index.insert(4, vec![1, 1,  1, 1,  1, 1,  2, 3]);
-
-        lsh_index.insert(5, vec![2, 2,  2, 3,  3, 3,  4, 4]);
-
-        lsh_index.insert(6, vec![3, 3,  3, 4,  4, 4,  5, 5]);
-        lsh_index.insert(7, vec![3, 3,  3, 4,  4, 4,  5, 6]);
-
-        let res = lsh_index.query(&vec![1, 1,  1, 1,  1, 1,  1, 1]);
-        assert_eq!(res, vec![1, 2, 3, 4].iter().collect());
-
-        // 1 was inserted first, so its signature is used for 1, 2, 3, 4
-        assert_eq!(lsh_index.remove(&1), true);
-        assert_eq!(lsh_index.removed_ids.len(), 1);
-        let res = lsh_index.query(&vec![1, 1,  1, 1,  1, 1,  1, 1]);
-        assert_eq!(res, vec![2, 3, 4].iter().collect());
-        assert_eq!(lsh_index.remove(&1), false);
-
-        // the signature of 2 was not used for indexing
-        lsh_index.remove(&2);
-        assert_eq!(lsh_index.removed_ids.len(), 1);
-        let res = lsh_index.query(&vec![1, 1,  1, 1,  1, 1,  1, 1]);
-        assert_eq!(res, vec![3, 4].iter().collect());
-        let res = lsh_index.query(&vec![1, 1,  1, 1,  1, 1,  2, 2]);
-        assert_eq!(res, vec![3, 4].iter().collect());
-
-        lsh_index.remove(&5);
-        assert_eq!(lsh_index.removed_ids.len(), 1);
-        let res = lsh_index.query(&vec![2, 2,  2, 3,  3, 3,  4, 4]);
-        assert_eq!(res, vec![].iter().collect());
-
-        // 7 can be fully removed
-        lsh_index.remove(&7);
-        assert_eq!(lsh_index.removed_ids.len(), 1);
-        let res = lsh_index.query(&vec![3, 3,  3, 4,  4, 4,  5, 5]);
-        assert_eq!(res, vec![6].iter().collect());
-
-        lsh_index.remove(&6);
-        assert_eq!(lsh_index.removed_ids.len(), 1);
-        assert_eq!(
-            lsh_index.removed_ids,
-            vec![1].into_iter().collect()
-        );
-        let res = lsh_index.query(&vec![3, 3,  3, 4,  4, 4,  5, 6]);
-        assert_eq!(res.len(), 0);
-
-        lsh_index.clean_removed();
-        assert_eq!(lsh_index.removed_ids.len(), 1);
-        assert_eq!(lsh_index.removed_ids, vec![1].into_iter().collect());
-
-        lsh_index.remove(&3);
-        lsh_index.remove(&4);
-        lsh_index.clean_removed();
-        assert_eq!(lsh_index.removed_ids.len(), 0);
-        assert_eq!(lsh_index.size(), 0);
-    }
-
-    #[cfg(not(feature = "unstable"))]
     #[test]
     pub fn test_remove() {
         let mut lsh_index = MinHashIndex::new(4, 2, 0.5);
@@ -1060,54 +887,34 @@ mod tests {
         assert_eq!(res, vec![1, 2, 3, 4].iter().collect());
 
         lsh_index.remove(&1);
-        assert_eq!(lsh_index.removed_ids.len(), 1);
         let res = lsh_index.query(&vec![1, 1,  1, 1,  1, 1,  1, 1]);
         assert_eq!(res, vec![2, 3, 4].iter().collect());
 
-        // the signature of 2 was not used for indexing
         lsh_index.remove(&2);
-        assert_eq!(lsh_index.removed_ids.len(), 2);
         let res = lsh_index.query(&vec![1, 1,  1, 1,  1, 1,  1, 1]);
         assert_eq!(res, vec![3, 4].iter().collect());
         let res = lsh_index.query(&vec![1, 1,  1, 1,  1, 1,  2, 2]);
         assert_eq!(res, vec![3, 4].iter().collect());
 
         lsh_index.remove(&5);
-        assert_eq!(lsh_index.removed_ids.len(), 2);
+
         let res = lsh_index.query(&vec![2, 2,  2, 3,  3, 3,  4, 4]);
         assert_eq!(res, vec![].iter().collect());
 
         lsh_index.remove(&7);
-        assert_eq!(lsh_index.removed_ids.len(), 3);
+
         let res = lsh_index.query(&vec![3, 3,  3, 4,  4, 4,  5, 5]);
         assert_eq!(res, vec![6].iter().collect());
 
         lsh_index.remove(&6);
-        assert_eq!(lsh_index.removed_ids.len(), 3);
-        assert_eq!(
-            lsh_index.removed_ids,
-            vec![1,2,7].into_iter().collect()
-        );
+
         let res = lsh_index.query(&vec![3, 3,  3, 4,  4, 4,  5, 6]);
         assert_eq!(res.len(), 0);
 
-        lsh_index.clean_removed();
-        assert_eq!(lsh_index.removed_ids.len(), 2);
-        assert_eq!(lsh_index.removed_ids, vec![1,2].into_iter().collect());
-
         lsh_index.remove(&3);
-        assert_eq!(lsh_index.removed_ids.len(), 3);
-        assert_eq!(lsh_index.removed_ids, vec![1,2,3].into_iter().collect());
-
         lsh_index.remove(&4);
-        assert_eq!(lsh_index.removed_ids.len(), 3);
-        assert_eq!(lsh_index.removed_ids, vec![1,2,3].into_iter().collect());
-
-        lsh_index.clean_removed();
-        assert_eq!(lsh_index.removed_ids.len(), 0);
         assert_eq!(lsh_index.size(), 0);
     }
-
 
     #[test]
     pub fn test_lsh_index_batch_construction() {
@@ -1123,7 +930,7 @@ mod tests {
         signatures.push((6, min_hash.create_signature(S6.split_whitespace())));
 
         lsh_index.par_bulk_insert_pairs(signatures);
-        assert_eq!(lsh_index.size, 6);
+        assert_eq!(lsh_index.size(), 6);
 
         let ret = lsh_index.query(&min_hash.create_signature(S2.split_whitespace()));
 
@@ -1186,7 +993,7 @@ mod tests {
 
         assert_eq!(vecs.len(), ids.len());
         lsh_index.par_bulk_insert(ids, signatures);
-        assert_eq!(lsh_index.size, 300);
+        assert_eq!(lsh_index.size(), 300);
 
         let ret = lsh_index.query(&min_hash.create_signature(v1.iter()));
         assert_eq!(ret.len(), 100);
@@ -1194,7 +1001,6 @@ mod tests {
 
         let ret = lsh_index.query_top_k(&min_hash.create_signature(v1.iter()), 10);
         assert_eq!(ret.len(), 10);
-        //println!("{:?}", ret);
 
         let ret = lsh_index.query(&min_hash.create_signature(v2.iter()));
         assert_eq!(ret.len(), 100);
