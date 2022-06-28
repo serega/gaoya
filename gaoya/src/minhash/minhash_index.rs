@@ -360,9 +360,11 @@ where
                              jaccard_threshold: f64, initial_capacity: usize) -> Self {
         let mut bands = Vec::new();
         let build_hasher = RandomState::new();
+
+        let band_capacity = (initial_capacity as f64 * 0.1) as usize ;
         for i in 0..num_bands {
             let (start, end) = (i * band_width, (i + 1) * band_width);
-            bands.push(MinHashBand::<T, Id>::new_with_capacity(start, end, initial_capacity, build_hasher.clone()));
+            bands.push(MinHashBand::<T, Id>::new_with_capacity(start, end, band_capacity, build_hasher.clone()));
         }
         let mut hash_table = AHashMap::default();
         hash_table.reserve(initial_capacity);
