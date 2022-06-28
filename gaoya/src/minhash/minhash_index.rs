@@ -681,7 +681,7 @@ where
             .collect();
 
         self.bands.par_iter_mut()
-            .map(|band| {
+            .for_each(|band| {
                 sigs.iter().zip(ids)
                     .for_each(|(sig, id)| band.remove(&id, sig))
             });
