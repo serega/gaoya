@@ -312,7 +312,7 @@ pub struct MinHashIndex<T, Id>
         Id: Hash + Eq + Clone,
 {
     bands: Vec<MinHashBand<T, Id>>,
-    id_signatures: AHashMap<Id, Vec<T>>,
+    id_signatures: HashMap<Id, Vec<T>, ahash::RandomState>,
     threshold: f64,
     r: usize,
     b: usize,
@@ -344,7 +344,7 @@ where
             let (start, end) = (i * band_width, (i + 1) * band_width);
             bands.push(MinHashBand::<T, Id>::new(start, end, build_hasher.clone()));
         }
-        let mut hash_table = AHashMap::default();
+        let mut hash_table = HashMap::with_hasher(ahash::RandomState::new());
         hash_table.reserve(1000);
         MinHashIndex {
             bands: bands,
@@ -366,7 +366,7 @@ where
             let (start, end) = (i * band_width, (i + 1) * band_width);
             bands.push(MinHashBand::<T, Id>::new_with_capacity(start, end, band_capacity, build_hasher.clone()));
         }
-        let mut hash_table = AHashMap::default();
+        let mut hash_table = HashMap::with_hasher(ahash::RandomState::new());
         hash_table.reserve(initial_capacity);
         MinHashIndex {
             bands: bands,
@@ -380,7 +380,7 @@ where
 
 
     /// Returns a reference to the map containing all inserted points
-    pub fn get_id_signature_map(&self) -> &AHashMap<Id, Vec<T>> {
+    pub fn get_id_signature_map(&self) -> &HashMap<Id, Vec<T>, ahash::RandomState> {
         &self.id_signatures
     }
 
