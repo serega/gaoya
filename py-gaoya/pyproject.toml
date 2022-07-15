@@ -5,5 +5,6 @@ build-backend = "maturin"
 [project]
 name = "gaoya"
 requires-python = ">=3.7"
+version = "0.1.2"
 
 

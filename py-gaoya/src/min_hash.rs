@@ -1,5 +1,4 @@
 use pyo3::prelude::*;
-use pyo3::{PyObjectProtocol};
 
 
 use crate::TokenizerSpecification;
@@ -213,10 +212,6 @@ macro_rules! py_minhash_index {
             pub fn size(&self) -> usize {
                 self.inner.size()
             }
-        }
-
-        #[pyproto]
-        impl PyObjectProtocol for $name {
             fn __str__(&self) -> PyResult<String> {
                 Ok(format!("{} {:?}", self.inner, self.tokenizer))
             }
@@ -224,7 +219,9 @@ macro_rules! py_minhash_index {
             fn __repr__(&self) -> PyResult<String> {
                 Ok(format!("{} {:?}", self.inner, self.tokenizer))
             }
+
         }
+
 
     };
 }
