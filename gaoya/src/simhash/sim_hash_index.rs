@@ -91,10 +91,6 @@ where
         }
     }
 }
-unsafe impl<S: SimHashBits, Id: Hash + Eq + Clone> Send for SimHashTable<S, Id> {}
-unsafe impl<S: SimHashBits, Id: Hash + Eq + Clone> Sync for SimHashTable<S, Id> {}
-
-
 
 pub struct SimHashIndex<S, Id>
 where

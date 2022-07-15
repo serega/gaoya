@@ -276,9 +276,9 @@ where
 /// # Examples
 ///
 /// ```
+/// use std::collections::HashSet;
 /// use gaoya::minhash::{MinHashIndex, MinHasher32, MinHasher} ;
 /// use gaoya::text::whitespace_split;
-/// use ahash::AHashSet;
 /// let corpus = [
 ///     "This is the first document.",
 ///     "This document is the second document.",
@@ -293,11 +293,11 @@ where
 /// }
 /// for (i, doc) in corpus.iter().enumerate() {
 ///     if i < 4 {
-///         let mut expected = AHashSet::default();
+///         let mut expected = HashSet::default();
 ///         expected.extend(vec![0, 1, 2, 3].into_iter());
 ///         assert_eq!(index.query_owned(&minhasher.create_signature(whitespace_split(&doc.to_lowercase()))), expected);
 ///     } else {
-///         let mut expected = AHashSet::default();
+///         let mut expected = HashSet::default();
 ///         expected.insert(4);
 ///         assert_eq!(index.query_owned(&minhasher.create_signature(whitespace_split(&doc.to_lowercase()))), expected);
 ///     }
@@ -499,7 +499,7 @@ where
 
     pub fn query_one(&self, query_signature: &Vec<T>) -> Option<(&Id, f64)> {
         assert_eq!(self.num_hashes(), query_signature.len());
-        let mut match_ids = AHashSet::with_capacity(10);
+        let mut match_ids = HashSet::with_capacity(10);
         for band in &self.bands {
             band.query(query_signature, &mut match_ids);
         }
@@ -513,9 +513,9 @@ where
             .max_by(|x, y| x.1.partial_cmp(&y.1).unwrap())
     }
 
-    pub fn query(&self, query_signature: &Vec<T>) -> AHashSet<&Id> {
+    pub fn query(&self, query_signature: &Vec<T>) -> HashSet<&Id> {
         assert_eq!(self.num_hashes(), query_signature.len());
-        let mut match_ids = AHashSet::with_capacity(10);
+        let mut match_ids = HashSet::with_capacity(10);
         for band in &self.bands {
             band.query(query_signature, &mut match_ids);
         }
@@ -530,27 +530,27 @@ where
     }
 
     #[inline]
-    pub fn query_by_id(&self, id: &Id) -> AHashSet<&Id> {
+    pub fn query_by_id(&self, id: &Id) -> HashSet<&Id> {
         match self.id_signatures.get(id) {
             Some(signature) => self.query(signature),
-            None => AHashSet::new()
+            None => HashSet::new()
         }
     }
 
     #[inline]
-    pub fn query_by_id_owned(&self, id: &Id) -> AHashSet<Id> {
+    pub fn query_by_id_owned(&self, id: &Id) -> HashSet<Id> {
         match self.id_signatures.get(id) {
             Some(signature) => self.query_owned(signature),
-            None => AHashSet::new()
+            None => HashSet::new()
         }
     }
 
-    pub fn query_owned(&self, query_signature: &Vec<T>) -> AHashSet<Id>
+    pub fn query_owned(&self, query_signature: &Vec<T>) -> HashSet<Id>
     where
         Id: Hash + Eq + Clone,
     {
         assert_eq!(self.num_hashes(), query_signature.len());
-        let mut match_ids = AHashSet::with_capacity(10);
+        let mut match_ids = HashSet::with_capacity(10);
         for band in &self.bands {
             band.query_to_owned(query_signature, &mut match_ids);
         }
@@ -561,7 +561,7 @@ where
         match_ids
     }
 
-    pub fn par_bulk_query(&self, signatures: &Vec<Vec<T>>) -> Vec<AHashSet<Id>>
+    pub fn par_bulk_query(&self, signatures: &Vec<Vec<T>>) -> Vec<HashSet<Id>>
         where
             Id: Hash + Eq + Clone + Send + Sync,
             T: Send + Sync
@@ -586,7 +586,7 @@ where
         where
             Id: Hash + Eq + Clone,
     {
-        let mut match_ids = AHashSet::with_capacity(10);
+        let mut match_ids = HashSet::with_capacity(10);
         for band in &self.bands {
             band.query_to_owned(query_signature, &mut match_ids);
         }
@@ -605,7 +605,7 @@ where
 
 
     pub fn query_top_k(&self, query_signature: &[T], k: usize) -> Vec<(Id, f64)> {
-        let mut match_ids = AHashSet::with_capacity(10);
+        let mut match_ids = HashSet::with_capacity(10);
         for band in &self.bands {
             band.query_to_owned(query_signature, &mut match_ids);
         }
@@ -768,12 +768,12 @@ impl<T, Id> QueryIndex for MinHashIndex<T, Id>
         Id: Hash + Eq + Clone {
     type Id = Id;
 
-    fn query(&self, id: &Self::Id) -> AHashSet<&Self::Id> {
+    fn query(&self, id: &Self::Id) -> HashSet<&Self::Id> {
         match self.id_signatures.get(id) {
             Some(signature) => {
                 self::MinHashIndex::query(self, signature)
             }
-            None => AHashSet::new()
+            None => HashSet::new()
         }
     }
 }
@@ -787,7 +787,7 @@ mod tests {
     use rand::prelude::ThreadRng;
     use rand::{thread_rng, Rng};
     use std::borrow::Borrow;
-    use ahash::AHashSet;
+    use std::collections::HashSet;
     use crate::minhash::min_hasher::MinHasher32;
     use crate::text::whitespace_split;
 
@@ -843,11 +843,11 @@ mod tests {
         }
         for (i, doc) in corpus.iter().enumerate() {
             if i < 4 {
-                let mut expected = AHashSet::default();
+                let mut expected = HashSet::new();
                 expected.extend(vec![0, 1, 2, 3].into_iter());
                 assert_eq!(index.query_owned(&minhasher.create_signature(whitespace_split(&doc.to_lowercase()))), expected);
             } else {
-                let mut expected = AHashSet::default();
+                let mut expected = HashSet::new();
                 expected.insert(4);
                 assert_eq!(index.query_owned(&minhasher.create_signature(whitespace_split(&doc.to_lowercase()))), expected);
             }

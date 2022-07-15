@@ -12,7 +12,7 @@ Main use cases for gaoya are clustering and deduplication
  ```
  use gaoya::minhash::{MinHashIndex, MinHasher32, MinHasher} ;
  use gaoya::text::whitespace_split;
- use ahash::AHashSet;
+ use std::collections::HashSet;
  let corpus = [
      "This is the first document.",
      "This document is the second document.",
@@ -27,11 +27,11 @@ Main use cases for gaoya are clustering and deduplication
  }
  for (i, doc) in corpus.iter().enumerate() {
      if i < 4 {
-         let mut expected = AHashSet::default();
+         let mut expected = HashSet::default();
          expected.extend(vec![0, 1, 2, 3].into_iter());
          assert_eq!(index.query_owned(&minhasher.create_signature(whitespace_split(&doc.to_lowercase()))), expected);
      } else {
-         let mut expected = AHashSet::default();
+         let mut expected = HashSet::default();
          expected.insert(4);
          assert_eq!(index.query_owned(&minhasher.create_signature(whitespace_split(&doc.to_lowercase()))), expected);
      }

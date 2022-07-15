@@ -8,5 +8,5 @@ use ahash::{AHasher, AHashSet};
 pub trait QueryIndex {
     type Id: Sized;
 
-    fn query(&self, id: &Self::Id) -> AHashSet<&Self::Id>;
+    fn query(&self, id: &Self::Id) -> HashSet<&Self::Id>;
 }
