@@ -15,9 +15,9 @@ impl<'a, T: ?Sized> MultiShingles<'a, T> {
 
     pub fn new(data: &'a T, from_size: usize, to_size: usize) -> Self {
         MultiShingles {
-            data: data,
-            from_size: from_size,
-            to_size: to_size,
+            data,
+            from_size,
+            to_size,
             size: from_size,
             step: 1,
         }
@@ -30,7 +30,7 @@ impl<'a, T> Iterator for MultiShingles<'a, [T]> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.data.len() >= self.size {
             let ret = &self.data[0..self.size];
-            self.size = self.size + 1;
+            self.size += 1;
             if self.size > self.to_size {
                 self.size = self.from_size;
                 self.data = &self.data[self.step..];
@@ -53,7 +53,7 @@ impl<'a> Iterator for MultiShingles<'a, str> {
         // iterator reproduces char boundary positions and its appropriate bytes
         let iter = self.data.as_bytes().iter().enumerate()
             // only char boundaries
-            .filter(|&(_, &b)| b < 128 || b >= 192);
+            .filter(|&(_, &b)| !(128..192).contains(&b));
 
         // get shingle end pos end step next pos at once
         for (i, _) in iter {

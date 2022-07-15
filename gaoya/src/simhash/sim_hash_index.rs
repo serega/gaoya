@@ -28,7 +28,7 @@ where
 {
     fn new(permutation: Permutation<S>) -> Self {
         SimHashTable {
-            permutation: permutation,
+            permutation,
             table: AHashMap::default(),
         }
     }
@@ -53,7 +53,7 @@ where
                 let matches = candidates
                     .iter()
                     .filter(|id| {
-                        let signature = id_signatures.get(&id).unwrap();
+                        let signature = id_signatures.get(id).unwrap();
                         query_signature.hamming_distance(signature) < max_distance
                     });
                 match_ids.extend(matches);
@@ -74,12 +74,9 @@ where
                 let matches = candidates
                     .iter()
                     .filter(|id| {
-                        let signature = id_signatures.get(&id).unwrap();
+                        let signature = id_signatures.get(id).unwrap();
                         query_signature.hamming_distance(signature) < max_distance
-                    })
-                    .map(|id| id.clone());
-
-
+                    }).cloned();
                 match_ids.extend(matches);
             }
             None => (),
@@ -122,8 +119,8 @@ where
         let permutations = Permutation::<S>::create(num_blocks, hamming_distance);
         let max_width: usize = permutations.iter().map(|p| p.width).max().unwrap();
         SimHashIndex {
-            num_blocks: num_blocks,
-            hamming_distance: hamming_distance,
+            num_blocks,
+            hamming_distance,
             hash_tables: (permutations
                 .into_iter()
                 .map(|permutation| SimHashTable::new(permutation))
@@ -168,7 +165,7 @@ where
                 let i: &(Id, S) = item;
                 let (a, b) = i;
                 let k: Id = a.clone();
-                table.insert(k, &b);
+                table.insert(k, b);
             }
         });
 
@@ -230,9 +227,7 @@ where
         let counts: Vec<usize> = self
             .hash_tables
             .iter()
-            .map(|table| table.avg_bucket_count())
-            .filter(|val| val.is_some())
-            .map(|val| val.unwrap())
+            .filter_map(|table| table.avg_bucket_count())
             .collect();
         match counts.len() {
             len if len > 0 => {

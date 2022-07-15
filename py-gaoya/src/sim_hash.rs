@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 extern crate gaoya;
 use self::gaoya::simhash::SimSipHasher128;
 use gaoya::simhash::{SimHash, SimHashIndex, SimSipHasher64};
-use gaoya::text::{shingle_text,  shingle_tokens, shingle_text_range, whitespace_split, MultiShingles};
+use gaoya::text::{shingle_text,  shingle_text_range, whitespace_split, MultiShingles};
 use shingles::Shingles;
 use rayon::prelude::*;
 use crate::TokenizerSpecification;

@@ -155,7 +155,7 @@ pub fn similarity_greater_than_threshold<T>(
     false
 }
 
-fn minhash_centroid<T>(signatures: &Vec<Vec<T>>) -> Vec<T>
+fn minhash_centroid<T>(signatures: &[Vec<T>]) -> Vec<T>
 where
     T: Hash + Copy + Eq,
 {
@@ -180,7 +180,7 @@ where
 
 }
 
-fn minhash_band_centroid_from_refs<T>(signatures: &Vec<&Vec<T>>, num_bands: usize, band_size: usize) -> Vec<T>
+fn minhash_band_centroid_from_refs<T>(signatures: &[&Vec<T>], num_bands: usize, band_size: usize) -> Vec<T>
     where
         T: Hash + Copy + Eq,
 {
@@ -208,7 +208,7 @@ fn minhash_band_centroid_from_refs<T>(signatures: &Vec<&Vec<T>>, num_bands: usiz
 
 }
 
-fn minhash_centroid_from_refs<T>(signatures: &Vec<&Vec<T>>) -> Vec<T>
+fn minhash_centroid_from_refs<T>(signatures: &[&Vec<T>]) -> Vec<T>
     where
         T: Hash + Copy + Eq,
 {

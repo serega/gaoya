@@ -19,8 +19,8 @@ pub struct SimSipHasher64 {
 impl SimSipHasher64 {
     pub fn new(key1: u64, key2: u64) -> Self {
         SimSipHasher64 {
-            key1: key1,
-            key2: key2,
+            key1,
+            key2,
         }
     }
 }
@@ -69,8 +69,8 @@ pub struct SimSipHasher128 {
 impl SimSipHasher128 {
     pub fn new(key1: u64, key2: u64) -> Self {
         SimSipHasher128 {
-            key1: key1,
-            key2: key2,
+            key1,
+            key2,
         }
     }
 }

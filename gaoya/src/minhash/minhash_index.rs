@@ -116,11 +116,11 @@ where
         let mut hash_table = HashMap::with_hasher(NoOpHashBuilder {});
         hash_table.reserve(1000);
         MinHashBand {
-            hash_table: hash_table,
-            band_start: band_start,
-            band_end: band_end,
+            hash_table,
+            band_start,
+            band_end,
             len: (band_end - band_start) as usize,
-            build_ahash: build_ahash,
+            build_ahash,
             phantom: PhantomData
         }
     }
@@ -132,29 +132,28 @@ where
         let mut hash_table = HashMap::with_hasher(NoOpHashBuilder {});
         hash_table.reserve(capacity);
         MinHashBand {
-            hash_table: hash_table,
-            band_start: band_start,
-            band_end: band_end,
+            hash_table,
+            band_start,
+            band_end,
             len: (band_end - band_start) as usize,
-            build_ahash: build_ahash,
+            build_ahash,
             phantom: PhantomData
         }
     }
 
 
     #[inline]
-    fn insert(&mut self, id: Id, signature: &Vec<T>) {
+    fn insert(&mut self, id: Id, signature: &[T]) {
         let band_data = &signature[self.band_start..self.band_end];
         let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
         self.hash_table
             .entry(band_key)
-            .or_insert(AHashSet::with_capacity(2))
-            .insert(id.clone());
-        ()
+            .or_insert_with(|| AHashSet::with_capacity(2))
+            .insert(id);
     }
 
     #[inline]
-    fn query<'a, S: BuildHasher>(&'a self, signature: &Vec<T>, match_ids: &mut HashSet<&'a Id, S>) {
+    fn query<'a, S: BuildHasher>(&'a self, signature: &[T], match_ids: &mut HashSet<&'a Id, S>) {
         let band_data = &signature[self.band_start..self.band_end];
         let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
         match self.hash_table.get(&band_key) {
@@ -164,7 +163,7 @@ where
     }
 
     #[inline]
-    fn query_to_owned<S: BuildHasher>(&self, signature: &Vec<T>, match_ids: &mut HashSet<Id, S>) {
+    fn query_to_owned<S: BuildHasher>(&self, signature: &[T], match_ids: &mut HashSet<Id, S>) {
         let band_data = &signature[self.band_start..self.band_end];
         let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
         match self.hash_table.get(&band_key) {
@@ -181,7 +180,7 @@ where
     /// band portion of the hash
     fn find_signature_with_highest_recall<'a>(
         &'a self,
-        signatures: &Vec<&[T]>,
+        signatures: &[&[T]],
         all_ids: &mut HashSet<&'a Id>,
     ) -> Option<usize> {
         let mut max_count: usize = 0;
@@ -219,7 +218,7 @@ where
 
     /// Removes id from the band
     /// Returns true if the band portion of the signature is not in the hashtable
-    fn remove(&mut self, id: &Id, signature: &Vec<T>) {
+    fn remove(&mut self, id: &Id, signature: &[T]) {
         let band_data = &signature[self.band_start..self.band_end];
         let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
         match self.hash_table.get_mut(&band_key) {
@@ -238,7 +237,7 @@ where
     }
 
     #[inline]
-    fn has_ids(&self, signature: &Vec<T>) -> bool {
+    fn has_ids(&self, signature: &[T]) -> bool {
         let band_data = &signature[self.band_start as usize..self.band_end as usize];
         let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
 
@@ -347,7 +346,7 @@ where
         let mut hash_table = HashMap::with_hasher(ahash::RandomState::new());
         hash_table.reserve(1000);
         MinHashIndex {
-            bands: bands,
+            bands,
             threshold: jaccard_threshold,
             id_signatures: hash_table,
             b: num_bands,
@@ -369,7 +368,7 @@ where
         let mut hash_table = HashMap::with_hasher(ahash::RandomState::new());
         hash_table.reserve(initial_capacity);
         MinHashIndex {
-            bands: bands,
+            bands,
             threshold: jaccard_threshold,
             id_signatures: hash_table,
             b: num_bands,
@@ -399,7 +398,7 @@ where
         Id: Hash + Eq + Clone + Send + Sync,
         T: Send + Sync,
     {
-        if signatures.len() > 0 {
+        if !signatures.is_empty() {
             assert_eq!(self.num_hashes(), signatures[0].len());
         }
         unsafe {
@@ -427,7 +426,7 @@ where
                     let i: &(Id, Vec<T>) = item;
                     let (a, b) = i;
                     let k: Id = a.clone();
-                    band.insert(k, &b);
+                    band.insert(k, b);
                 }
             });
         }
@@ -505,17 +504,13 @@ where
             band.query(query_signature, &mut match_ids);
         }
 
-        let best_match = match_ids.into_iter()
+        match_ids.into_iter()
             .map(|id| {
                 let signature = &self.id_signatures[id];
                 (id, compute_minhash_similarity(signature, query_signature))
             })
             .filter(|pair| pair.1 > self.threshold)
-            .max_by(|x, y| x.1.partial_cmp(&y.1).unwrap());
-        match best_match {
-            Some(pair) => Some(pair),
-            None => None
-        }
+            .max_by(|x, y| x.1.partial_cmp(&y.1).unwrap())
     }
 
     pub fn query(&self, query_signature: &Vec<T>) -> AHashSet<&Id> {
@@ -587,7 +582,7 @@ where
     }
 
 
-    pub fn query_owned_return_similarity(&self, query_signature: &Vec<T>) -> Vec<(Id, f64)>
+    pub fn query_owned_return_similarity(&self, query_signature: &[T]) -> Vec<(Id, f64)>
         where
             Id: Hash + Eq + Clone,
     {
@@ -609,7 +604,7 @@ where
     }
 
 
-    pub fn query_top_k(&self, query_signature: &Vec<T>, k: usize) -> Vec<(Id, f64)> {
+    pub fn query_top_k(&self, query_signature: &[T], k: usize) -> Vec<(Id, f64)> {
         let mut match_ids = AHashSet::with_capacity(10);
         for band in &self.bands {
             band.query_to_owned(query_signature, &mut match_ids);
@@ -670,15 +665,13 @@ where
             Id: Hash + Eq + Clone + Send + Sync,
             T: Send + Sync {
         let sigs: Vec<Vec<T>> = ids.iter()
-            .map(|id| self.id_signatures.remove(&id))
-            .filter(|o| o.is_some())
-            .map(|o| o.unwrap())
+            .filter_map(|id| self.id_signatures.remove(id))
             .collect();
 
         self.bands.par_iter_mut()
             .for_each(|band| {
                 sigs.iter().zip(ids)
-                    .for_each(|(sig, id)| band.remove(&id, sig))
+                    .for_each(|(sig, id)| band.remove(id, sig))
             });
     }
 
@@ -698,7 +691,7 @@ where
     /// each candidate using full minhash similarity measure.
     fn filter_by_minhash_similarity<'a>(
         &self,
-        query_signature: &Vec<T>,
+        query_signature: &[T],
         candidates: HashSet<&'a Id>,
     ) -> HashSet<&'a Id> {
         let mut result = HashSet::new();
@@ -716,10 +709,8 @@ where
     pub fn calculate_centroid(&self, ids: &[Id]) -> Vec<T> where
          {
 
-        let signatures = ids.iter()
-            .map(|id| self.id_signatures.get(&id))
-            .filter(|option| option.is_some())
-            .map(|option| option.unwrap())
+        let signatures: Vec<_> = ids.iter()
+            .filter_map(|id| self.id_signatures.get(id))
             .collect();
         minhash_band_centroid_from_refs(&signatures, self.b, self.r)
     }
@@ -755,7 +746,7 @@ where
             let index = band.find_signature_with_highest_recall(&band_signatures, &mut all_ids);
             match index {
                 Some(index) => {
-                    centroid_signature.extend_from_slice(&band_signatures[index]);
+                    centroid_signature.extend_from_slice(band_signatures[index]);
                 }
                 None => {
                     centroid_signature.extend_from_slice(&first_signature[self.band_range(i)]);
