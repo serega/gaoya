@@ -32,26 +32,26 @@ impl TokenizerSpecification {
             match range {
                 Some(range) => {
                     if range.0 == range.1 {
-                        return CharShingle((range.0, None));
+                        CharShingle((range.0, None))
                     } else {
-                        return CharShingle((range.0, Some(range.1)));
+                        CharShingle((range.0, Some(range.1)))
                     }
                 }
                 None => {
-                    return CharShingle((3, Some(4)))
+                    CharShingle((3, Some(4)))
                 }
             }
         } else {
             match range {
                 Some(range) => {
                     if range.0 == range.1 {
-                        return WhiteSpaceShingle((range.0, None));
+                        WhiteSpaceShingle((range.0, None))
                     } else {
-                        return WhiteSpaceShingle((range.0, Some(range.1)));
+                        WhiteSpaceShingle((range.0, Some(range.1)))
                     }
                 }
                 None => {
-                    return WhiteSpace();
+                    WhiteSpace()
                 }
             }
 

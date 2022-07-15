@@ -104,7 +104,7 @@ impl MinHashStringIndex {
     }
 
     pub fn size(&self) -> usize {
-        return self.doc_id as usize;
+        self.doc_id as usize
     }
 }
 

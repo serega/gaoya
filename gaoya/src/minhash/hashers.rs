@@ -29,8 +29,7 @@ impl Hasher for Sha1Hasher {
         let mut sha = Sha1::new();
         sha.write(self.bytes.as_slice());
         let result = sha.finalize();
-        let hash64 = u64::from_be_bytes(result[0..8].try_into().unwrap());
-        hash64
+        u64::from_be_bytes(result[0..8].try_into().unwrap())
     }
 
     fn write(&mut self, bytes: &[u8]) {
@@ -39,3 +38,8 @@ impl Hasher for Sha1Hasher {
 }
 
 
+impl Default for Sha1Hasher {
+    fn default() -> Self {
+        Self::new()
+    }
+}

@@ -18,7 +18,6 @@ pub use self::string_index::MinHashStringIndex;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::iter::FromIterator;
-use fxhash::FxBuildHasher;
 use num_traits::{AsPrimitive, PrimInt};
 use rayon::prelude::*;
 
@@ -110,6 +109,7 @@ pub fn compute_jaccard_distance<T, U>(iter_1: T, iter_2: T) -> f32
 /// assert!((compute_minhash_similarity(&m1, &m2) - 0.666) < 0.01);
 ///
 /// ```
+#[inline]
 pub fn compute_minhash_similarity<T>(min_hashes_1: &[T], min_hashes_2: &[T]) -> f64
     where
         T: Eq,
@@ -124,6 +124,7 @@ pub fn compute_minhash_similarity<T>(min_hashes_1: &[T], min_hashes_2: &[T]) -> 
     (matches as f64) / (num_hashes as f64)
 }
 
+#[inline]
 pub fn compute_minhash_distance<T>(min_hashes_1: &[T], min_hashes_2: &[T]) -> f64
     where
         T: Eq,
@@ -154,7 +155,7 @@ pub fn similarity_greater_than_threshold<T>(
     false
 }
 
-fn minhash_centroid<T>(signatures: &Vec<Vec<T>>) -> Vec<T>
+fn minhash_centroid<T>(signatures: &[Vec<T>]) -> Vec<T>
 where
     T: Hash + Copy + Eq,
 {
@@ -179,7 +180,7 @@ where
 
 }
 
-fn minhash_band_centroid_from_refs<T>(signatures: &Vec<&Vec<T>>, num_bands: usize, band_size: usize) -> Vec<T>
+fn minhash_band_centroid_from_refs<T>(signatures: &[&Vec<T>], num_bands: usize, band_size: usize) -> Vec<T>
     where
         T: Hash + Copy + Eq,
 {
@@ -207,7 +208,7 @@ fn minhash_band_centroid_from_refs<T>(signatures: &Vec<&Vec<T>>, num_bands: usiz
 
 }
 
-fn minhash_centroid_from_refs<T>(signatures: &Vec<&Vec<T>>) -> Vec<T>
+fn minhash_centroid_from_refs<T>(signatures: &[&Vec<T>]) -> Vec<T>
     where
         T: Hash + Copy + Eq,
 {

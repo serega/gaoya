@@ -39,7 +39,7 @@ where
             let mut i = 0;
             let mut j;
 
-            while (S::one() << i) & mask.clone() == S::zero() {
+            while (S::one() << i) & mask == S::zero() {
                 i += 1;
             }
 
@@ -49,7 +49,7 @@ where
             }
 
             width += (j - i);
-            widths.push((j - i));
+            widths.push(j - i);
 
             let offset: isize = type_width as isize - width as isize - i as isize;
             offsets[mask_index] = offset;
@@ -60,7 +60,7 @@ where
         width = 0;
         for i in (0..widths.len() - diff_bits) {
             width += widths[i];
-            p.offsets_masks.push((masks[i].clone(), offsets[i]))
+            p.offsets_masks.push((masks[i], offsets[i]))
         }
         p.width = width;
         for _i in 0..width {
@@ -70,7 +70,7 @@ where
             p.search_mask = p.search_mask << 1;
         }
         for mask in choice {
-            p.simple_mask = p.simple_mask | mask;
+            p.simple_mask |= mask;
         }
         p
     }
@@ -87,7 +87,7 @@ where
             let start = (i * S::bit_length()) / num_blocks;
             let end = ((i + 1) * S::bit_length()) / num_blocks;
             for j in start..end {
-                mask = mask | S::one() << j;
+                mask |= S::one() << j;
             }
             blocks.push(mask);
         }
@@ -97,12 +97,12 @@ where
             let mut all_blocks = combination.clone();
             for v in &blocks {
                 if !all_blocks.contains(&v) {
-                    all_blocks.push(v.clone());
+                    all_blocks.push(*v);
                 }
             }
             permutations.push(Permutation::new(diff_bits, all_blocks, combination));
         }
-        return permutations;
+        permutations
     }
 
     pub fn permute(&self, sim_hash: &S) -> S {
@@ -113,9 +113,9 @@ where
             let offset = pair.1;
             let mask = pair.0;
             if offset > 0 {
-                result = result | (*sim_hash & mask) << offset as usize;
+                result |= (*sim_hash & mask) << offset as usize;
             } else {
-                result = result | (*sim_hash & mask) >> (0 - offset) as usize;
+                result |= (*sim_hash & mask) >> (0 - offset) as usize;
             }
         }
         result & self.search_mask

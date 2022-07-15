@@ -27,7 +27,7 @@ impl MinHasher64V1<FnvBuildHasher> {
     /// let min_hash = MinHasher64V1::new(100);
     /// ```
     pub fn new(num_hashes: usize) -> Self {
-        return MinHasher64V1::new_with_hasher(num_hashes, FnvBuildHasher::default());
+        MinHasher64V1::new_with_hasher(num_hashes, FnvBuildHasher::default())
     }
 }
 
@@ -42,7 +42,7 @@ impl<B: BuildHasher> MinHasher64V1<B> {
         let rand_range1 = Uniform::from(1..MERSENNE_PRIME);
         let rand_range2 = Uniform::from(0..MERSENNE_PRIME);
         MinHasher64V1 {
-            build_hasher: build_hasher,
+            build_hasher,
             a: (0..num_hashes)
                 .map(|_| rand_range1.sample(&mut rng))
                 .collect(),
@@ -58,11 +58,12 @@ impl<B: BuildHasher> MinHasher64V1<B> {
         self.num_hashes
     }
 
-    fn get_min_hashes_into_vec<T, U>(&self, iter: T, ret: &mut Vec<u64>)
+    fn get_min_hashes_into_vec<T, U>(&self, iter: T, ret: &mut[u64])
     where
         T: Iterator<Item = U>,
         U: Hash,
     {
+        assert_eq!(self.num_hashes, ret.len());
         let hashes: Vec<u64> = iter
             .map(|item| {
                 let mut hasher = self.build_hasher.build_hasher();
@@ -71,9 +72,9 @@ impl<B: BuildHasher> MinHasher64V1<B> {
             })
             .collect::<Vec<_>>();
 
-        if hashes.len() > 0 {
-            for index in 0..self.num_hashes {
-                let m = hashes
+        if !hashes.is_empty() {
+            for (index, hash) in ret.iter_mut().enumerate() {
+                *hash = hashes
                     .iter()
                     .map(|hash| {
                         hash.wrapping_mul(self.a[index]).wrapping_add(self.b[index])
@@ -81,7 +82,6 @@ impl<B: BuildHasher> MinHasher64V1<B> {
                     })
                     .min()
                     .unwrap();
-                ret[index] = m;
             }
         }
     }

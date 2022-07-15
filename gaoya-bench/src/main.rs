@@ -41,7 +41,10 @@ fn run_clustering<M: MinHasher>(generated_clusters: &Vec<GeneratedCluster>,
     lsh.par_bulk_insert(ids, hashes);
     println!("Starting clustering {}", lsh);
     let clusterer = Clusterer::<u32>::new(50, 10);
-    let mut points: Vec<ClusterPoint<u32>> = lsh.get_keys();
+    let mut points: Vec<ClusterPoint<u32>> = lsh.get_id_signature_map()
+        .keys()
+        .map(|key| key.clone())
+        .collect();
     let now = Instant::now();
     let clusters = clusterer.cluster_par(&mut points, &lsh);
     let elapsed = now.elapsed();
@@ -66,7 +69,7 @@ fn run_clustering<M: MinHasher>(generated_clusters: &Vec<GeneratedCluster>,
         match centroid_index.query_one(&signature) {
             Some(cluster_id) => {
                 let cluster = clusters.iter()
-                    .find(|cl| cl.cluster_id == *cluster_id)
+                    .find(|cl| cl.cluster_id == *cluster_id.0)
                     .unwrap();
                 let cluster_ids: HashSet<u32> = cluster.points.iter()
                     .map(|p| p.id.clone())
@@ -83,7 +86,7 @@ fn run_clustering<M: MinHasher>(generated_clusters: &Vec<GeneratedCluster>,
 
 
 fn main() {
-    let mut generator = ClusterGenerator::new(0.6, 200, 30, 5000, 0, 300_000, DifferenceMode::SameIndices);
+    let mut generator = ClusterGenerator::new(0.6, 200, 30, 500, 0, 300_000, DifferenceMode::SameIndices);
     let generated_clusters = generator.generate();
     println!("Generated {} clusters", generated_clusters.len());
     let params = (50, 5);

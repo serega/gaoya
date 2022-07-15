@@ -2,7 +2,6 @@ use crate::simhash::permutation::Permutation;
 use crate::simhash::sim_hash::SimHash;
 use crate::simhash::SimHashBits;
 use core::mem;
-use fxhash::{FxBuildHasher, FxHashMap};
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
@@ -11,6 +10,7 @@ use std::fmt::Debug;
 use std::hash::{BuildHasher, Hash};
 use std::marker::PhantomData;
 use std::ops::BitOrAssign;
+use ahash::{AHashMap, AHashSet};
 
 struct SimHashTable<S, Id>
 where
@@ -18,7 +18,7 @@ where
     S: SimHashBits,
 {
     permutation: Permutation<S>,
-    table: FxHashMap<S, Vec<Id>>,
+    table: AHashMap<S, Vec<Id>>,
 }
 
 impl<S, Id> SimHashTable<S, Id>
@@ -28,8 +28,8 @@ where
 {
     fn new(permutation: Permutation<S>) -> Self {
         SimHashTable {
-            permutation: permutation,
-            table: FxHashMap::default(),
+            permutation,
+            table: AHashMap::default(),
         }
     }
 
@@ -43,7 +43,7 @@ where
 
     fn query<'a, B: BuildHasher>(&'a self,
                                  query_signature: &S,
-                                 id_signatures: &FxHashMap<Id, S>,
+                                 id_signatures: &AHashMap<Id, S>,
                                  match_ids: &mut HashSet<&'a Id, B>,
                                  max_distance: usize)
     {
@@ -53,7 +53,7 @@ where
                 let matches = candidates
                     .iter()
                     .filter(|id| {
-                        let signature = id_signatures.get(&id).unwrap();
+                        let signature = id_signatures.get(id).unwrap();
                         query_signature.hamming_distance(signature) < max_distance
                     });
                 match_ids.extend(matches);
@@ -64,7 +64,7 @@ where
 
     fn query_owned<'a, B: BuildHasher>(&'a self,
                                        query_signature: &S,
-                                       id_signatures: &FxHashMap<Id, S>,
+                                       id_signatures: &AHashMap<Id, S>,
                                        match_ids: &mut HashSet<Id, B>,
                                        max_distance: usize)
     {
@@ -74,12 +74,9 @@ where
                 let matches = candidates
                     .iter()
                     .filter(|id| {
-                        let signature = id_signatures.get(&id).unwrap();
+                        let signature = id_signatures.get(id).unwrap();
                         query_signature.hamming_distance(signature) < max_distance
-                    })
-                    .map(|id| id.clone());
-
-
+                    }).cloned();
                 match_ids.extend(matches);
             }
             None => (),
@@ -94,10 +91,6 @@ where
         }
     }
 }
-unsafe impl<S: SimHashBits, Id: Hash + Eq + Clone> Send for SimHashTable<S, Id> {}
-unsafe impl<S: SimHashBits, Id: Hash + Eq + Clone> Sync for SimHashTable<S, Id> {}
-
-
 
 pub struct SimHashIndex<S, Id>
 where
@@ -107,7 +100,7 @@ where
     num_blocks: usize,
     hamming_distance: usize,
     hash_tables: Vec<SimHashTable<S, Id>>,
-    id_signatures: FxHashMap<Id, S>,
+    id_signatures: AHashMap<Id, S>,
     marker: PhantomData<(S, Id)>,
     size: usize,
 }
@@ -122,13 +115,13 @@ where
         let permutations = Permutation::<S>::create(num_blocks, hamming_distance);
         let max_width: usize = permutations.iter().map(|p| p.width).max().unwrap();
         SimHashIndex {
-            num_blocks: num_blocks,
-            hamming_distance: hamming_distance,
+            num_blocks,
+            hamming_distance,
             hash_tables: (permutations
                 .into_iter()
                 .map(|permutation| SimHashTable::new(permutation))
                 .collect()),
-            id_signatures: FxHashMap::default(),
+            id_signatures: AHashMap::default(),
             marker: PhantomData,
             size: 0,
         }
@@ -168,7 +161,7 @@ where
                 let i: &(Id, S) = item;
                 let (a, b) = i;
                 let k: Id = a.clone();
-                table.insert(k, &b);
+                table.insert(k, b);
             }
         });
 
@@ -178,16 +171,16 @@ where
         self.id_signatures.shrink_to_fit();
     }
 
-    pub fn query(&self, query_signature: &S) -> HashSet<&Id, FxBuildHasher> {
-        let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
+    pub fn query(&self, query_signature: &S) -> AHashSet<&Id> {
+        let mut match_ids = AHashSet::with_capacity(10);
         for table in &self.hash_tables {
             table.query(query_signature, &self.id_signatures,  &mut match_ids, self.hamming_distance);
         }
         match_ids
     }
 
-    pub fn query_owned(&self, query_signature: &S) -> HashSet<Id, FxBuildHasher> {
-        let mut match_ids = HashSet::with_capacity_and_hasher(10, FxBuildHasher::default());
+    pub fn query_owned(&self, query_signature: &S) -> AHashSet<Id> {
+        let mut match_ids = AHashSet::with_capacity(10);
         for table in &self.hash_tables {
             table.query_owned(query_signature, &self.id_signatures,  &mut match_ids, self.hamming_distance);
         }
@@ -202,7 +195,7 @@ where
         result
     }
 
-    pub fn par_bulk_query(&self, signatures: &Vec<S>) -> Vec<HashSet<Id, FxBuildHasher>>
+    pub fn par_bulk_query(&self, signatures: &Vec<S>) -> Vec<AHashSet<Id>>
     where
         S: Send + Sync,
         Id: Send + Sync,
@@ -230,9 +223,7 @@ where
         let counts: Vec<usize> = self
             .hash_tables
             .iter()
-            .map(|table| table.avg_bucket_count())
-            .filter(|val| val.is_some())
-            .map(|val| val.unwrap())
+            .filter_map(|table| table.avg_bucket_count())
             .collect();
         match counts.len() {
             len if len > 0 => {

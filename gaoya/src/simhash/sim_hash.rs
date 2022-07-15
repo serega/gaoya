@@ -22,7 +22,7 @@ where
 {
     pub fn new(hasher: H) -> Self {
         SimHash {
-            hasher: hasher,
+            hasher,
             marker: PhantomData,
         }
     }
