@@ -43,7 +43,7 @@ macro_rules! make_min_hasher {
                 let rand_range1 = Uniform::from(1..MERSENNE_PRIME_31);
                 let rand_range2 = Uniform::from(0..MERSENNE_PRIME_31);
                 $name {
-                    build_hasher: build_hasher,
+                    build_hasher,
                     a: (0..num_hashes)
                         .map(|_| rand_range1.sample(&mut rng))
                         .collect(),

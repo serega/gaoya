@@ -11,11 +11,11 @@ use std::collections::hash_map::RawEntryMut;
 
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
-use std::ops::Range;
+use std::ops::{Index, Range};
 use ahash::{AHasher, AHashMap, AHashSet, RandomState};
 use itertools::Itertools;
 use crate::clustering::QueryIndex;
-
+use crate::minhash::id_container::{HashSetContainer, IdContainer};
 
 
 /// BandKey contains the hash of the band.
@@ -93,24 +93,25 @@ impl BuildHasher for NoOpHashBuilder {
 }
 
 
-struct MinHashBand<T, Id>
+struct MinHashBand<T, Id, C>
 where
     T: MinHashType,
     Id: Hash + Eq + Clone,
+    C: IdContainer<Id>
 {
-    hash_table: HashMap<BandKey, AHashSet<Id>, NoOpHashBuilder>,
+    hash_table: HashMap<BandKey, C, NoOpHashBuilder>,
     band_start: usize,
     band_end: usize,
     len: usize,
     build_ahash: RandomState,
-    phantom: PhantomData<T>,
-
+    phantom: PhantomData<(T, Id)>,
 }
 
-impl<T, Id> MinHashBand<T, Id>
+impl<T, Id, C> MinHashBand<T, Id, C>
 where
     T: MinHashType,
     Id: Hash + Eq + Clone,
+    C: IdContainer<Id>
 {
     pub fn new(band_start: usize, band_end: usize, build_ahash: RandomState) -> Self {
         let mut hash_table = HashMap::with_hasher(NoOpHashBuilder {});
@@ -121,7 +122,7 @@ where
             band_end,
             len: (band_end - band_start) as usize,
             build_ahash,
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 
@@ -137,7 +138,7 @@ where
             band_end,
             len: (band_end - band_start) as usize,
             build_ahash,
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 
@@ -148,8 +149,8 @@ where
         let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
         self.hash_table
             .entry(band_key)
-            .or_insert_with(|| AHashSet::with_capacity(2))
-            .insert(id);
+            .or_insert_with(|| C::new())
+            .push(id);
     }
 
     #[inline]
@@ -157,18 +158,18 @@ where
         let band_data = &signature[self.band_start..self.band_end];
         let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
         match self.hash_table.get(&band_key) {
-            Some(ids) => match_ids.extend(ids.iter()),
+            Some(ids) =>  ids.copy_refs_to(match_ids),
             None => (),
         }
     }
 
     #[inline]
-    fn query_to_owned<S: BuildHasher>(&self, signature: &[T], match_ids: &mut HashSet<Id, S>) {
+    fn query_to_owned(&self, signature: &[T], match_ids: &mut HashSet<Id>) {
         let band_data = &signature[self.band_start..self.band_end];
         let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
         match self.hash_table.get(&band_key) {
             Some(ids) => {
-                match_ids.extend(ids.iter().cloned());
+                ids.copy_to(match_ids);
             }
             None => (),
         }
@@ -178,43 +179,43 @@ where
     /// of this band on points that are not in all_ids.
     /// Used by centroid calculation to choose the most optimal
     /// band portion of the hash
-    fn find_signature_with_highest_recall<'a>(
-        &'a self,
-        signatures: &[&[T]],
-        all_ids: &mut HashSet<&'a Id>,
-    ) -> Option<usize> {
-        let mut max_count: usize = 0;
-        let mut best_index: isize = -1;
-        for minhash in signatures.iter().enumerate() {
-            let band_data = &minhash.1[self.band_start..self.band_end];
-            let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
-            match self.hash_table.get(&band_key) {
-                Some(ids) => {
-                    let new_count = ids.iter()
-                        .map(|id| !all_ids.contains(&id) as usize)
-                        .count();
-                    if new_count > max_count {
-                        max_count = new_count;
-                        best_index = minhash.0 as isize;
-                    }
-                }
-                None => (),
-            }
-        }
-        let band_data = &signatures[best_index as usize][self.band_start..self.band_end];
-        let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
-        match self.hash_table.get(&band_key) {
-            Some(ids) => {
-                all_ids.extend(ids.iter())
-            }
-            None => (),
-        }
-        if best_index >= 0 {
-            Some(best_index as usize)
-        } else {
-            None
-        }
-    }
+    // fn find_signature_with_highest_recall<'a>(
+    //     &'a self,
+    //     signatures: &[&[T]],
+    //     all_ids: &mut HashSet<&'a Id>,
+    // ) -> Option<usize> {
+    //     let mut max_count: usize = 0;
+    //     let mut best_index: isize = -1;
+    //     for minhash in signatures.iter().enumerate() {
+    //         let band_data = &minhash.1[self.band_start..self.band_end];
+    //         let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
+    //         match self.hash_table.get(&band_key) {
+    //             Some(ids) => {
+    //                 let new_count = ids.iter()
+    //                     .map(|id| !all_ids.contains(&id) as usize)
+    //                     .count();
+    //                 if new_count > max_count {
+    //                     max_count = new_count;
+    //                     best_index = minhash.0 as isize;
+    //                 }
+    //             }
+    //             None => (),
+    //         }
+    //     }
+    //     let band_data = &signatures[best_index as usize][self.band_start..self.band_end];
+    //     let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
+    //     match self.hash_table.get(&band_key) {
+    //         Some(ids) => {
+    //             all_ids.extend(ids.iter())
+    //         }
+    //         None => (),
+    //     }
+    //     if best_index >= 0 {
+    //         Some(best_index as usize)
+    //     } else {
+    //         None
+    //     }
+    // }
 
     /// Removes id from the band
     /// Returns true if the band portion of the signature is not in the hashtable
@@ -249,14 +250,14 @@ where
 
     pub fn shrink_to_fit(&mut self) {
         for item in self.hash_table.iter_mut() {
-            item.1.shrink_to_fit();
+            //item.1.shrink_to_fit();
         }
         self.hash_table.shrink_to_fit();
     }
 
     pub fn shrink_to(&mut self, min_capacity: usize) {
         for item in self.hash_table.iter_mut() {
-            item.1.shrink_to_fit();
+            //item.1.shrink_to_fit();
         }
         self.hash_table.shrink_to(min_capacity);
     }
@@ -305,12 +306,13 @@ where
 ///
 /// ```
 #[derive()]
-pub struct MinHashIndex<T, Id>
-    where
-        T: MinHashType,
-        Id: Hash + Eq + Clone,
+pub struct MinHashIndex<T, Id, C = HashSetContainer<Id>>
+where
+    T: MinHashType,
+    Id: Hash + Eq + Clone,
+    C: IdContainer<Id>
 {
-    bands: Vec<MinHashBand<T, Id>>,
+    bands: Vec<MinHashBand<T, Id, C>>,
     id_signatures: HashMap<Id, Vec<T>, ahash::RandomState>,
     threshold: f64,
     r: usize,
@@ -318,10 +320,11 @@ pub struct MinHashIndex<T, Id>
     num_hashes: usize
 }
 
-impl<T, Id> fmt::Display for MinHashIndex<T, Id>
+impl<T, Id, C> fmt::Display for MinHashIndex<T, Id, C>
 where
     T: MinHashType,
     Id: Hash + Eq + Clone,
+    C: IdContainer<Id>
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "MinHashIndex<{}> {{ threshold = {}, num_hashes = {}, bands = {}, rows_per_band = {}, size = {} }}",
@@ -331,17 +334,30 @@ where
 }
 
 impl<T, Id> MinHashIndex<T, Id>
-where
-    T: MinHashType,
-    Id: Hash + Eq + Clone,
+    where
+        T: MinHashType,
+        Id: Hash + Eq + Clone + Send + Sync
 {
     /// Create a new MinHashIndex
     pub fn new(num_bands: usize, band_width: usize, jaccard_threshold: f64) -> Self {
+        MinHashIndex::<T, Id, HashSetContainer<Id>>::new_index(num_bands, band_width, jaccard_threshold)
+    }
+}
+
+
+impl<T, Id, C> MinHashIndex<T, Id, C>
+where
+    T: MinHashType,
+    Id: Hash + Eq + Clone,
+    C: IdContainer<Id>
+{
+    /// Create a new MinHashIndex
+    pub fn new_index(num_bands: usize, band_width: usize, jaccard_threshold: f64) -> Self {
         let build_hasher = RandomState::new();
         let mut bands = Vec::new();
         for i in 0..num_bands {
             let (start, end) = (i * band_width, (i + 1) * band_width);
-            bands.push(MinHashBand::<T, Id>::new(start, end, build_hasher.clone()));
+            bands.push(MinHashBand::<T, Id, C>::new(start, end, build_hasher.clone()));
         }
         let mut hash_table = HashMap::with_hasher(ahash::RandomState::new());
         hash_table.reserve(1000);
@@ -355,15 +371,24 @@ where
         }
     }
 
+    /// Creates new MinHashIndex with specified `initial_capacity` and `expected_similarity_ratio`,
+    /// which is the expected ratio of similar documents to the total.
+    /// `MinHashIndex` stores signatures in bands, such that similar signatures locate in
+    /// the same location within the band. The size of the band in inversely proportional to
+    /// the similarity ratio.
+    /// For example with similarity ratio 0.9 the band size on average will be 0.1 of the total
+    /// number of signatures.
     pub fn new_with_capacity(num_bands: usize, band_width: usize,
-                             jaccard_threshold: f64, initial_capacity: usize) -> Self {
+                             jaccard_threshold: f64,
+                             initial_capacity: usize,
+                             expected_similarity_ratio: f64) -> Self {
         let mut bands = Vec::new();
         let build_hasher = RandomState::new();
 
-        let band_capacity = (initial_capacity as f64 * 0.1) as usize ;
+        let band_capacity = (initial_capacity as f64 * (1.0 - expected_similarity_ratio)) as usize;
         for i in 0..num_bands {
             let (start, end) = (i * band_width, (i + 1) * band_width);
-            bands.push(MinHashBand::<T, Id>::new_with_capacity(start, end, band_capacity, build_hasher.clone()));
+            bands.push(MinHashBand::<T, Id, C>::new_with_capacity(start, end, band_capacity, build_hasher.clone()));
         }
         let mut hash_table = HashMap::with_hasher(ahash::RandomState::new());
         hash_table.reserve(initial_capacity);
@@ -401,15 +426,15 @@ where
         if !signatures.is_empty() {
             assert_eq!(self.num_hashes(), signatures[0].len());
         }
-        unsafe {
-            self.bands.par_iter_mut().for_each(|band| {
-                for item in signatures.iter().zip(ids.iter()) {
-                    let hashes = item.0;
-                    let id = item.1.clone();
-                    band.insert(id, hashes);
-                }
-            });
-        }
+
+        self.bands.par_iter_mut().for_each(|band| {
+            for item in signatures.iter().zip(ids.iter()) {
+                let hashes = item.0;
+                let id = item.1.clone();
+                band.insert(id, hashes);
+            }
+        });
+
         for id_hash in ids.into_iter().zip(signatures.into_iter()) {
             self.id_signatures.insert(id_hash.0, id_hash.1);
         }
@@ -420,16 +445,15 @@ where
         Id: Hash + Eq + Clone + Send + Sync,
         T: Send + Sync,
     {
-        unsafe {
-            self.bands.par_iter_mut().for_each(|band| {
-                for item in id_signature_pairs.iter() {
-                    let i: &(Id, Vec<T>) = item;
-                    let (a, b) = i;
-                    let k: Id = a.clone();
-                    band.insert(k, b);
-                }
-            });
-        }
+        self.bands.par_iter_mut().for_each(|band| {
+            for item in id_signature_pairs.iter() {
+                let i: &(Id, Vec<T>) = item;
+                let (a, b) = i;
+                let k: Id = a.clone();
+                band.insert(k, b);
+            }
+        });
+
         for id_hash in id_signature_pairs {
             self.id_signatures.insert(id_hash.0, id_hash.1);
         }
@@ -715,57 +739,79 @@ where
         minhash_band_centroid_from_refs(&signatures, self.b, self.r)
     }
 
-    pub fn calculate_centroid_experimental<I>(&self,  ids: I) -> Vec<T>
-    where
-        I: Iterator<Item = Id> {
-        let mut bands: Vec<HashSet<&[T]>> = Vec::new();
-        for i in 0..self.b {
-            bands.push(HashSet::new());
-        }
-        let mut first_signature = None;
-        for id in ids {
-            let mut signature = self.id_signatures.get(&id).unwrap();
-            for i in 0..self.b {
-                let band: &[T] = &signature[self.band_range(i)];
-                bands[i].insert(band);
-            }
-
-            match first_signature {
-                None => {
-                    first_signature.insert(signature);
-                }
-                Some(_) => {}
-            };
-        }
-        let first_signature = first_signature.unwrap();
-        let mut all_ids = HashSet::new();
-        let mut centroid_signature = Vec::new();
-        for i in 0..self.b {
-            let band: &MinHashBand<T, Id> = &self.bands[i];
-            let band_signatures: Vec<&[T]> = bands[i].iter().map(|k| *k).collect();
-            let index = band.find_signature_with_highest_recall(&band_signatures, &mut all_ids);
-            match index {
-                Some(index) => {
-                    centroid_signature.extend_from_slice(band_signatures[index]);
-                }
-                None => {
-                    centroid_signature.extend_from_slice(&first_signature[self.band_range(i)]);
-                }
-            }
-        }
-        centroid_signature
-    }
+    // pub fn calculate_centroid_experimental<I>(&self,  ids: I) -> Vec<T>
+    // where
+    //     I: Iterator<Item = Id> {
+    //     let mut bands: Vec<HashSet<&[T]>> = Vec::new();
+    //     for i in 0..self.b {
+    //         bands.push(HashSet::new());
+    //     }
+    //     let mut first_signature = None;
+    //     for id in ids {
+    //         let mut signature = self.id_signatures.get(&id).unwrap();
+    //         for i in 0..self.b {
+    //             let band: &[T] = &signature[self.band_range(i)];
+    //             bands[i].insert(band);
+    //         }
+    //
+    //         match first_signature {
+    //             None => {
+    //                 first_signature.insert(signature);
+    //             }
+    //             Some(_) => {}
+    //         };
+    //     }
+    //     let first_signature = first_signature.unwrap();
+    //     let mut all_ids = HashSet::new();
+    //     let mut centroid_signature = Vec::new();
+    //     for i in 0..self.b {
+    //         let band: &MinHashBand<T, Id, C> = &self.bands[i];
+    //         let band_signatures: Vec<&[T]> = bands[i].iter().map(|k| *k).collect();
+    //         let index = band.find_signature_with_highest_recall(&band_signatures, &mut all_ids);
+    //         match index {
+    //             Some(index) => {
+    //                 centroid_signature.extend_from_slice(band_signatures[index]);
+    //             }
+    //             None => {
+    //                 centroid_signature.extend_from_slice(&first_signature[self.band_range(i)]);
+    //             }
+    //         }
+    //     }
+    //     centroid_signature
+    // }
 
     fn band_range(&self, band_index: usize) -> Range<usize> {
         band_index * self.r..(band_index + 1) * self.r
     }
 
+    pub fn band_sizes(&self) -> BandStats {
+        let band_sizes: Vec<_> = self.bands.iter()
+            .map(|band| band.hash_table.len())
+            .collect();
+        let max_size = band_sizes.iter().max().unwrap();
+        let min_size = band_sizes.iter().min().unwrap();
+        BandStats {
+            min_size: *min_size,
+            max_size: *max_size,
+            sizes: band_sizes
+        }
+    }
+
 }
 
-impl<T, Id> QueryIndex for MinHashIndex<T, Id>
+
+#[derive(Debug)]
+pub struct BandStats {
+    pub min_size: usize,
+    pub max_size: usize,
+    pub sizes: Vec<usize>
+}
+
+impl<T, Id, C> QueryIndex for MinHashIndex<T, Id, C>
     where
         T: MinHashType ,
-        Id: Hash + Eq + Clone {
+        Id: Hash + Eq + Clone,
+        C: IdContainer<Id>{
     type Id = Id;
 
     fn query(&self, id: &Self::Id) -> HashSet<&Self::Id> {
@@ -782,12 +828,14 @@ impl<T, Id> QueryIndex for MinHashIndex<T, Id>
 #[cfg(test)]
 mod tests {
     use crate::minhash::min_hasher64::MinHasher64V1;
-    use crate::minhash::{calculate_b_and_r, calculate_minhash_params, MinHasher, MinHashIndex};
+    use crate::minhash::{calculate_b_and_r, calculate_minhash_params, HashSetContainer, IdContainer, MinHasher, MinHashIndex, SmallVecContainer};
     use rand::distributions::{Distribution, Uniform};
     use rand::prelude::ThreadRng;
     use rand::{thread_rng, Rng};
     use std::borrow::Borrow;
     use std::collections::HashSet;
+    use fnv::FnvBuildHasher;
+    use crate::minhash::id_container::VecContainer;
     use crate::minhash::min_hasher::MinHasher32;
     use crate::text::whitespace_split;
 
@@ -855,9 +903,14 @@ mod tests {
 
     }
 
+
     #[test]
     pub fn test_remove() {
-        let mut lsh_index = MinHashIndex::new(4, 2, 0.5);
+        _test_remove(&mut MinHashIndex::new(4, 2, 0.5));
+        _test_remove(&mut MinHashIndex::<_, _, VecContainer<_>>::new_index(4, 2, 0.5));
+        _test_remove(&mut MinHashIndex::<_, _, SmallVecContainer<_, 4>>::new_index(4, 2, 0.5));
+    }
+    pub fn _test_remove<C: IdContainer<u32>>(lsh_index: &mut MinHashIndex<u32, u32, C>) {
         lsh_index.insert(1, vec![1, 1,  1, 1,  1, 1,  1, 1]);
         lsh_index.insert(2, vec![1, 1,  1, 1,  1, 1,  1, 1]);
 
@@ -905,9 +958,22 @@ mod tests {
     #[test]
     pub fn test_lsh_index_batch_construction() {
         let (b, r) = calculate_minhash_params(0.5, 200);
-        let min_hash = MinHasher64V1::new(b * r);
-        let mut lsh_index: MinHashIndex<u64, u64> = MinHashIndex::new(b, r, 0.5);
-        let mut signatures: Vec<(u64, Vec<u64>)> = Vec::new();
+        let min_hash = MinHasher32::new(b * r);
+
+        fn new_index<C: IdContainer<u32>>(b: usize, r: usize) -> MinHashIndex<u32, u32, C> {
+            MinHashIndex::<_, _, C>::new_index(b, r, 0.5)
+        }
+
+        _test_lsh_index_batch_construction(&min_hash, &mut new_index::<HashSetContainer<u32>>(b, r));
+        _test_lsh_index_batch_construction(&min_hash, &mut new_index::<VecContainer<u32>>(b, r));
+        _test_lsh_index_batch_construction(&min_hash, &mut new_index::<SmallVecContainer<u32, 4>>(b, r));
+    }
+
+
+    pub fn _test_lsh_index_batch_construction<C: IdContainer<u32>>(
+        min_hash: &MinHasher32<FnvBuildHasher>,
+        lsh_index: &mut MinHashIndex<u32, u32, C>) {
+        let mut signatures: Vec<(u32, Vec<u32>)> = Vec::new();
         signatures.push((1, min_hash.create_signature(S1.split_whitespace())));
         signatures.push((2, min_hash.create_signature(S2.split_whitespace())));
         signatures.push((3, min_hash.create_signature(S3.split_whitespace())));

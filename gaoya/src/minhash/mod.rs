@@ -5,6 +5,7 @@ mod min_hasher64;
 mod minhash_index;
 mod string_index;
 mod super_min_hash;
+mod id_container;
 
 
 pub use self::hashers::SipHasher24BuildHasher;
@@ -15,6 +16,10 @@ pub use self::min_hasher::MinHasher16;
 pub use self::min_hasher::MinHasher32;
 pub use self::minhash_index::MinHashIndex;
 pub use self::string_index::MinHashStringIndex;
+pub use self::id_container::IdContainer;
+pub use self::id_container::HashSetContainer;
+pub use self::id_container::SmallVecContainer;
+pub use self::id_container::VecContainer;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::iter::FromIterator;

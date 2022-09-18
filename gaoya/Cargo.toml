@@ -33,6 +33,7 @@ seahash = "4.1.0"
 itertools = "0.10.3"
 num-traits = "0.2.15"
 shingles = "0.1.1"
+smallvec = { version = "1.9.0", features = ["const_generics", "const_new"] }
 crossbeam-utils = "0.8.10"
 triomphe = "0.1.7"
 fnv = "1.0.7"

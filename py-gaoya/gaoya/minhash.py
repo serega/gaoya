@@ -53,6 +53,14 @@ class MinHashStringIndex:
         only bigrams.
         Only applies if `analyzer` is not callable.
 
+    id_container: str, default="set"
+        The data structure used as a bucket to hold ids of documents.
+        When efficient removals required use set.
+        When removals are not required or rare use vec.
+        When the number of similar documents (duplicates) is expected to be small use smallvec which
+        can store up to two ids inline without allocation, which reduces memory usage
+        and improves performamance.
+
     Examples
     --------
             >>> index = gaoya.minhash.MinHashStringIndex(32, 0.5, 42, 3, None, 'word', True, (1,1))
@@ -81,25 +89,43 @@ class MinHashStringIndex:
                  num_hashes=None,
                  analyzer='word',
                  lowercase=False,
-                 ngram_range=None):
+                 ngram_range=None,
+                 id_container='set'):
         if hash_size not in [8, 16, 32, 64]:
             raise ValueError(f"Invalid hash_size {hash_size}. hash_size must be on of 8, 16, 32 or 64")
         if jaccard_threshold < 0.0 or jaccard_threshold > 1.0:
             raise ValueError(f"Jaccard threshold must be between 0 and 1")
+        if id_container not in ("set", "vec", "smallvec"):
+            raise ValueError(f"id_container must be one of ('set', 'vec', 'smallvec')")
         self.analyzer = analyzer
         # if analyzer is callable we need to pass something to index's constructor.
         analyzer = 'word' if callable(self.analyzer) else analyzer
-        if hash_size == 64:
-            self.index = m.MinHash64StringIntIndex(jaccard_threshold, num_bands, band_size, num_hashes, analyzer, lowercase, ngram_range)
-        elif hash_size == 32:
-            self.index = m.MinHash32StringIntIndex(jaccard_threshold, num_bands, band_size, num_hashes, analyzer, lowercase, ngram_range)
-        elif hash_size == 16:
-            self.index = m.MinHash16StringIntIndex(jaccard_threshold, num_bands, band_size, num_hashes, analyzer, lowercase, ngram_range)
-        elif hash_size == 8:
-            self.index = m.MinHash8StringIntIndex(jaccard_threshold, num_bands, band_size, num_hashes, analyzer, lowercase, ngram_range)
-        else:
-            raise ValueError(f"Invalid hash size {hash_size}")
 
+        constructors = {
+            64: {
+                'set': m.MinHash64StringIntIndexHashSet,
+                'vec': m.MinHash64StringIntIndexVec,
+                'smallvec': m.MinHash64StringIntIndexSmallVec,
+            },
+            32: {
+                'set': m.MinHash32StringIntIndexHashSet,
+                'vec': m.MinHash32StringIntIndexVec,
+                'smallvec': m.MinHash32StringIntIndexSmallVec,
+            },
+            16: {
+                'set': m.MinHash16StringIntIndexHashSet,
+                'vec': m.MinHash16StringIntIndexVec,
+                'smallvec': m.MinHash16StringIntIndexSmallVec,
+            },
+            8: {
+                'set': m.MinHash8StringIntIndexHashSet,
+                'vec': m.MinHash8StringIntIndexVec,
+                'smallvec': m.MinHash8StringIntIndexSmallVec,
+            }
+        }
+
+        type = constructors[hash_size][id_container]
+        self.minhash_index = type(jaccard_threshold, num_bands, band_size, num_hashes, analyzer, lowercase, ngram_range)
 
     def insert_document(self, id, doc):
         """
@@ -114,9 +140,9 @@ class MinHashStringIndex:
             Document text
         """
         if callable(self.analyzer):
-            self.index.insert_tokens(id, self.analyzer(doc))
+            self.minhash_index.insert_tokens(id, self.analyzer(doc))
         else:
-            self.index.insert_document(id, doc)
+            self.minhash_index.insert_document(id, doc)
 
     def query(self, doc: str, return_similarity=False) -> Union[List[int], List[Tuple[int, float]]]:
         """
@@ -138,14 +164,14 @@ class MinHashStringIndex:
         """
         if callable(self.analyzer):
             if return_similarity:
-                return self.index.query_tokens_return_similarity(self.analyzer(doc))
+                return self.minhash_index.query_tokens_return_similarity(self.analyzer(doc))
             else:
-                return self.index.query_tokens(self.analyzer(doc))
+                return self.minhash_index.query_tokens(self.analyzer(doc))
         else:
             if return_similarity:
-                return self.index.query_return_similarity(doc)
+                return self.minhash_index.query_return_similarity(doc)
             else:
-                return self.index.query(doc)
+                return self.minhash_index.query(doc)
 
     def par_bulk_query(self, docs: List[str], return_similarity=False):
         """
@@ -167,14 +193,14 @@ class MinHashStringIndex:
         if callable(self.analyzer):
             analyzed_docs = [self.analyzer(doc) for doc in docs]
             if return_similarity:
-                return self.index.par_bulk_query_tokens_return_similarity(analyzed_docs)
+                return self.minhash_index.par_bulk_query_tokens_return_similarity(analyzed_docs)
             else:
-                return self.index.par_bulk_query_tokens(analyzed_docs)
+                return self.minhash_index.par_bulk_query_tokens(analyzed_docs)
         else:
             if return_similarity:
-                return self.index.par_bulk_query_return_similarity(docs)
+                return self.minhash_index.par_bulk_query_return_similarity(docs)
             else:
-                return self.index.par_bulk_query(docs)
+                return self.minhash_index.par_bulk_query(docs)
 
 
 
@@ -193,36 +219,29 @@ class MinHashStringIndex:
         """
         if callable(self.analyzer):
             tokens = [self.analyzer(doc) for doc in docs]
-            self.index.bulk_insert_tokens(ids, tokens)
+            self.minhash_index.bulk_insert_tokens(ids, tokens)
         else:
-            self.index.par_bulk_insert_docs(ids, docs)
+            self.minhash_index.par_bulk_insert_docs(ids, docs)
 
     def remove(self, id: int):
         """
         Removes id from the index.
-
-        Currently, this method may not remove the minhash associated with `id` from memory if there is another minhash
-        with the same value at any band.
-        To fully remove minhash from memory gaoya needs to be compiled on nightly Rust channel with `--features "unstable"`
-        This will work on the stable when this issue is resolved
-        https://github.com/rust-lang/rust/issues/56167
-
 
         Parameters
         ----------
         id: int
             Id of the document
         """
-        self.index.remove(id)
+        self.minhash_index.remove(id)
 
     def size(self):
         """
         Returns the number of documents in the index
         """
-        return self.index.size()
+        return self.minhash_index.size()
 
     def __str__(self):
-        return self.index.__str__()
+        return self.minhash_index.__str__()
 
     def __repr__(self):
-        return self.index.__repr__()
+        return self.minhash_index.__repr__()
