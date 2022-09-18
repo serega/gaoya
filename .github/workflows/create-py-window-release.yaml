@@ -35,6 +35,6 @@ jobs:
           MATURIN_PASSWORD: ${{ secrets.PYPI_PASS }}
           RUSTFLAGS: '-C target-feature=+fxsr,+sse,+sse2,+sse3,+ssse3,+sse4.1,+popcnt'
         with:
-          maturin-version: 0.12.6
+          maturin-version: 0.13.3
           command: publish
           args: -m py-gaoya/Cargo.toml --no-sdist --universal2 -o wheels -i python --username serenky
