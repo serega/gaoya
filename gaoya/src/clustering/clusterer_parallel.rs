@@ -1,5 +1,5 @@
 use crate::clustering::QueryIndex;
-use crate::minhash::MinHashIndex;
+use crate::minhash::{IdContainer, MinHashIndex, MinHashType};
 use crossbeam_utils::atomic::AtomicCell;
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -133,16 +133,17 @@ impl<Id> Cluster<Id> {
 ///
 /// the same cluster from a different point.
 ///
-pub struct Clusterer<Id> {
+pub struct Clusterer<T, Id> {
     cluster_id_sequence: AtomicU32,
-    phandom: PhantomData<Id>,
+    phandom: PhantomData<(T, Id)>,
     n_threads: usize,
     min_cluster_size: usize,
 }
 
-impl<Id> Clusterer<Id>
+impl<T, Id> Clusterer<T, Id>
 where
     Id: Hash + Eq + Clone + Sync + Send,
+    T: MinHashType
 {
     pub fn new(min_cluster_size: usize, n_threads: usize) -> Self {
         Clusterer {
@@ -161,10 +162,10 @@ where
         self.cluster_slice(points.as_mut_slice(), query_index)
     }
 
-    pub fn cluster_par(
+    pub fn cluster_par<C: IdContainer<ClusterPoint<Id>>>(
         &self,
         points: &mut Vec<ClusterPoint<Id>>,
-        query_index: &(dyn QueryIndex<Id = ClusterPoint<Id>> + Sync),
+        query_index: &MinHashIndex<T, ClusterPoint<Id>, C>,
     ) -> Vec<Box<Cluster<Id>>> {
         let chunk_size = points.len() / self.n_threads;
         let result: Vec<_> = points.par_chunks_mut(chunk_size)

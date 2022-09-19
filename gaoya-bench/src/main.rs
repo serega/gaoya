@@ -1,6 +1,7 @@
 #![allow(unused_imports)]
 mod metrics;
 mod generate_clusters;
+mod load_index_bench;
 
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
@@ -12,12 +13,14 @@ use std::time::Instant;
 use fxhash::FxBuildHasher;
 use gaoya::clustering::clusterer_parallel::{Clusterer, ClusterPoint, ClusterPointInner};
 
-use gaoya::minhash::{MinHasher32, MinHasher16, MinHashIndex, MinHasher64V1, MinHasher, SipHasher24BuildHasher, calculate_minhash_params, MinHasher8};
+use gaoya::minhash::{MinHasher32, MinHasher16, MinHashIndex, MinHasher64V1, MinHasher, SipHasher24BuildHasher, calculate_minhash_params, MinHasher8, HashSetContainer, SmallVecContainer, compute_minhash_similarity};
 use rayon::prelude::*;
 
 use itertools::Itertools;
 use rand::{Rng, thread_rng};
+use gaoya::text::shingle_text;
 use crate::generate_clusters::*;
+use crate::load_index_bench::load_random;
 use crate::metrics::Metrics;
 
 
@@ -26,7 +29,7 @@ fn run_clustering<M: MinHasher>(generated_clusters: &Vec<GeneratedCluster>,
                                 num_bands: usize, band_width: usize, jaccard_threshold: f64)
     where M::V: Clone, M: Sync + Send {
     println!("Creating index {}", std::any::type_name::<M>());
-    let mut lsh = MinHashIndex::new(num_bands, band_width, jaccard_threshold);
+    let mut lsh = MinHashIndex::<_, _, SmallVecContainer<_, 10>>::new_index(num_bands, band_width, jaccard_threshold);
     let mut ids = Vec::new();
     let mut vals = Vec::new();
     for cluster in generated_clusters {
@@ -39,8 +42,8 @@ fn run_clustering<M: MinHasher>(generated_clusters: &Vec<GeneratedCluster>,
     let ids = ids.par_iter()
         .map(|id| ClusterPoint::new(ClusterPointInner::new(id.clone()))).collect();
     lsh.par_bulk_insert(ids, hashes);
-    println!("Starting clustering {}", lsh);
-    let clusterer = Clusterer::<u32>::new(50, 10);
+    //println!("Starting clustering {}", lsh);
+    let clusterer = Clusterer::<_, u32>::new(50, 10);
     let mut points: Vec<ClusterPoint<u32>> = lsh.get_id_signature_map()
         .keys()
         .map(|key| key.clone())
@@ -55,7 +58,9 @@ fn run_clustering<M: MinHasher>(generated_clusters: &Vec<GeneratedCluster>,
         .map(|cluster| lsh.calculate_centroid(cluster.points.as_slice()))
         .collect();
 
-    let mut centroid_index = MinHashIndex::new(num_bands, band_width, jaccard_threshold);
+
+    let mut centroid_index = MinHashIndex::<_, _, SmallVecContainer<_, 2>>
+        ::new_index(num_bands, band_width, jaccard_threshold);
     for i in 0..clusters.len() {
         centroid_index.insert(clusters[i].cluster_id, centroids[i].clone());
     }
@@ -86,13 +91,22 @@ fn run_clustering<M: MinHasher>(generated_clusters: &Vec<GeneratedCluster>,
 
 
 fn main() {
-    let mut generator = ClusterGenerator::new(0.6, 200, 30, 500, 0, 300_000, DifferenceMode::SameIndices);
-    let generated_clusters = generator.generate();
-    println!("Generated {} clusters", generated_clusters.len());
-    let params = (50, 5);
-    println!("{:?}", params);
+    // let mut generator = ClusterGenerator::new(0.6, 200, 30, 500, 0, 300_000, DifferenceMode::SameIndices);
+    // let generated_clusters = generator.generate();
+    // println!("Generated {} clusters", generated_clusters.len());
+    // let params = (50, 5);
+    // println!("{:?}", params);
+    //
+    // run_clustering(&generated_clusters, MinHasher8::new(params.0 * params.1), params.0, params.1, 0.6);
+    // run_clustering(&generated_clusters, MinHasher16::new(params.0 * params.1), params.0, params.1, 0.6);
+    // run_clustering(&generated_clusters, MinHasher32::new(params.0 * params.1), params.0, params.1, 0.6);
 
-    run_clustering(&generated_clusters, MinHasher8::new(params.0 * params.1), params.0, params.1, 0.6);
-    run_clustering(&generated_clusters, MinHasher16::new(params.0 * params.1), params.0, params.1, 0.6);
-    run_clustering(&generated_clusters, MinHasher32::new(params.0 * params.1), params.0, params.1, 0.6);
+   // load_random();
+
+    let minhasher = MinHasher8::new(200);
+    let m1 = minhasher.create_signature(shingle_text("hello", 1));
+    let m2 = minhasher.create_signature(shingle_text("helli", 1));
+
+    let similarity = compute_minhash_similarity(m1.as_slice(), m2.as_slice());
+    println!("{similarity}");
 }

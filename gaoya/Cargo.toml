@@ -22,10 +22,10 @@ path = "src/lib.rs"
 bench = false
 
 [dependencies]
-ahash = "0.7.6"
+ahash = "0.8.0"
 rand = "0.8.5"
 rand_pcg = "0.3.1"
-sha-1 = "0.9.8"
+sha-1 = "0.10.0"
 siphasher = "0.3.10"
 random_choice = "0.3.2"
 rayon = "1.5.3"
@@ -33,6 +33,7 @@ seahash = "4.1.0"
 itertools = "0.10.3"
 num-traits = "0.2.15"
 shingles = "0.1.1"
+smallvec = { version = "1.9.0", features = ["const_generics", "const_new"] }
 crossbeam-utils = "0.8.10"
 triomphe = "0.1.7"
 fnv = "1.0.7"

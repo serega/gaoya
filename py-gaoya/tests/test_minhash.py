@@ -12,43 +12,46 @@ def test_minhash_64bit():
     assert index.query("a b g h f") == []
 
 
+def do_test_minhash(index):
+    index.insert_document(1, "a b c d e f")
+    index.insert_document(2, "1 2 3 4 5 6 8")
+
+    assert index.query(" a b c d e f") == [1]
+    assert index.query(" a b c d e g") == [1]
+    assert index.query("a b h g f") == []
+
+    assert index.query("1 2 3 4 5 6 8") == [2]
+    assert index.query("1 2 3 4 5 6 9 10") == [2]
+
+    index.remove(1)
+    assert index.query(" a b c d e f") == []
+
+
+def _test_min_hash(hash_len):
+    index = MinHashStringIndex(hash_len, 0.5, 30, 5)
+    do_test_minhash(index)
+
+    index = MinHashStringIndex(hash_len, 0.5, 30, 5, id_container="vec")
+    do_test_minhash(index)
+
+    index = MinHashStringIndex(hash_len, 0.5, 30, 5, id_container="smallvec")
+    do_test_minhash(index)
+
+    try:
+        index = MinHashStringIndex(hash_len, 0.5, 30, 5, id_container="array")
+        assert False, "id_container array is not supported"
+    except Exception as e:
+        assert type(e) == ValueError
+
 
 def test_minhash_32bit():
-    index = MinHashStringIndex(32, 0.5, 30, 5)
-    index.insert_document(1, "a b c d e f")
-    index.insert_document(2, "1 2 3 4 5 6 8")
-
-    assert index.query(" a b c d e f") == [1]
-    assert index.query(" a b c d e g") == [1]
-    assert index.query("a b h g f") == []
-
-    assert index.query("1 2 3 4 5 6 8") == [2]
-    assert index.query("1 2 3 4 5 6 9 10") == [2]
+    _test_min_hash(32)
 
 def test_minhash_16bit():
-    index = MinHashStringIndex(16, 0.5, 30, 5)
-    index.insert_document(1, "a b c d e f")
-    index.insert_document(2, "1 2 3 4 5 6 8")
-
-    assert index.query(" a b c d e f") == [1]
-    assert index.query(" a b c d e g") == [1]
-    assert index.query("a b h g f") == []
-
-    assert index.query("1 2 3 4 5 6 8") == [2]
-    assert index.query("1 2 3 4 5 6 9 10") == [2]
-
+    _test_min_hash(16)
 
 def test_minhash_8bit():
-    index = MinHashStringIndex(8, 0.5, 30, 5)
-    index.insert_document(1, "a b c d e f")
-    index.insert_document(2, "1 2 3 4 5 6 8")
-
-    assert index.query(" a b c d e f") == [1]
-    assert index.query(" a b c d e g") == [1]
-    assert index.query("a b h g f") == []
-
-    assert index.query("1 2 3 4 5 6 8") == [2]
-    assert index.query("1 2 3 4 5 6 9 10") == [2]
+    _test_min_hash(8)
 
 def test_minhash_16bit_custom_analyzer():
     def split_and_uppercase(doc):
