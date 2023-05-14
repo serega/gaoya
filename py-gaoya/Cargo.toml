@@ -16,11 +16,7 @@ crate-type = ["cdylib"]
 no-dev-version = true
 disable-publish = true
 
-[package.metadata.maturin]
-name = "gaoya"
-classifier = [
-    "Programming Language :: Rust",
-]
+
 
 [dependencies]
 libc = "0.2.106"
