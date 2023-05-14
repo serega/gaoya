@@ -29,15 +29,15 @@ macro_rules! py_minhash_index {
         #[pymethods]
         impl $name {
             #[new]
-            #[args(
-                jaccard_threshold = "0.5",
-                num_bands = "42",
-                band_width = "3",
-                num_hashes = "126",
-                analyzer = "\"word\"",
-                lowercase = "false",
-                ngram_range = "(1,1)"
-            )]
+            #[pyo3(signature =
+                (jaccard_threshold = 0.5,
+                num_bands = 42,
+                band_width = 3,
+                num_hashes = 126,
+                analyzer = "word",
+                lowercase = false,
+                ngram_range = (1,1)
+            ))]
             pub fn new(
                 jaccard_threshold: f64,
                 num_bands: Option<usize>,

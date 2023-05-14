@@ -1,6 +1,6 @@
 [package]
 name = "pygaoya"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Sergey Melderis <sergey.melderis@gmail.com>"]
 edition = "2021"
 license = "MIT"
@@ -24,8 +24,8 @@ classifier = [
 
 [dependencies]
 libc = "0.2.106"
-pyo3 = { version = "0.17.1", features = ["extension-module", "abi3-py37"] }
-rayon = "1.5.3"
+pyo3 = { version = "0.18.3", features = ["extension-module", "abi3-py37"] }
+rayon = "1.7.0"
 shingles = "0.1.1"
 fnv = "1.0.7"
 

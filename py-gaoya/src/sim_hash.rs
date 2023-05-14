@@ -20,13 +20,13 @@ macro_rules! py_simhash_index {
         #[pymethods]
             impl $name {
             #[new]
-            #[args(
-                num_blocks = "6",
-                max_distance = "5",
-                analyzer = "\"word\"",
-                lowercase = "false",
-                ngram_range = "(1,1)"
-            )]
+            #[pyo3(signature = (
+                num_blocks = 6,
+                max_distance = 5,
+                analyzer = "word",
+                lowercase = false,
+                ngram_range = (1,1)
+            ))]
             pub fn new(num_blocks: usize,
                        max_distance: usize,
                        analyzer: Option<&str>,
