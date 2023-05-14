@@ -529,10 +529,9 @@ where
         }
 
         match_ids.into_iter()
-            .map(|id| {
-                let signature = &self.id_signatures[id];
-                (id, compute_minhash_similarity(signature, query_signature))
-            })
+            .map(|id| (id, self.id_signatures.get(&id)))
+            .filter(|(id, sig)| sig.is_some())
+            .map(|(id, sig)| (id, compute_minhash_similarity(sig.unwrap(), query_signature)))
             .filter(|pair| pair.1 > self.threshold)
             .max_by(|x, y| x.1.partial_cmp(&y.1).unwrap())
     }
@@ -545,11 +544,13 @@ where
         }
 
         match_ids.retain(|id| {
-            let signature = &self.id_signatures[id];
-            compute_minhash_similarity(signature, query_signature) >= self.threshold
+            match self.id_signatures.get(id) {
+                Some(signature) => {
+                    compute_minhash_similarity(signature, query_signature) >= self.threshold
+                },
+                None => false
             }
-        );
-
+        });
         match_ids
     }
 
@@ -579,8 +580,12 @@ where
             band.query_to_owned(query_signature, &mut match_ids);
         }
         match_ids.retain(|id| {
-            let signature = &self.id_signatures[id];
-            compute_minhash_similarity(signature, query_signature) >= self.threshold
+            match self.id_signatures.get(id) {
+                Some(signature) => {
+                    compute_minhash_similarity(signature, query_signature) >= self.threshold
+                },
+                None => false
+            }
         });
         match_ids
     }
@@ -1066,7 +1071,39 @@ mod tests {
         lsh_index.bulk_remove(&removed_ids);
         let ret = lsh_index.query(&min_hash.create_signature(v1.iter()));
         assert_eq!(ret.len(), 50);
-        //assert_eq!((0..100).filter(|i| ret.contains(&i)).count(), 100);
 
+    }
+
+    // This test addresses issue #19 - Duplicate ids causes panic
+    #[test]
+    pub fn test_duplidate_ids() {
+        let (b, r) = calculate_minhash_params(0.5, 200);
+        let min_hash = MinHasher64V1::new(b * r);
+        let mut lsh_index = MinHashIndex::new(b, r, 0.5);
+        lsh_index.insert(1, min_hash.create_signature(S1.split_whitespace()));
+        let (id, _) = lsh_index.query_one(&min_hash.create_signature(S1.split_whitespace())).unwrap();
+        assert_eq!(*id, 1);
+
+        // Inserting a record with the same ID. The index with contain
+        // signatures S4 and S6 associated with the same ID 1
+        lsh_index.insert(1, min_hash.create_signature(S4.split_whitespace()));
+        assert_eq!(lsh_index.size(), 1);
+
+        let ret = lsh_index.query_one(&min_hash.create_signature(S1.split_whitespace()));
+        assert_eq!(None, ret);
+
+        let (id, similarity) = lsh_index.query_one(&min_hash.create_signature(S4.split_whitespace())).unwrap();
+        assert_eq!(*id, 1);
+
+        lsh_index.insert(6, min_hash.create_signature(S6.split_whitespace()));
+        assert_eq!(lsh_index.size(), 2);
+
+        // We remove entry with ID 1. Because S1 was overwritten with S4 the signature
+        // for S1 will still be in the index
+        lsh_index.remove(&1);
+        let ret = lsh_index.query(&min_hash.create_signature(S1.split_whitespace()));
+        assert_eq!(HashSet::new(), ret);
+        let ret = lsh_index.query_one(&min_hash.create_signature(S1.split_whitespace()));
+        assert_eq!(None, ret);
     }
 }
