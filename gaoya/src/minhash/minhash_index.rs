@@ -274,6 +274,13 @@ where
 /// Configuration parameters to [`MinHashIndex::new`](struct.MinHashIndex.html#method.new)
 /// `num_bands` and `band_width` correspond to `b` and `r` in MMDS book.
 ///
+/// # Type Parameters
+/// `T`: The type of the individual hash in the signature
+/// `Id`: The type of id associated with each signature. The type can be any `Hash` + `Eq` + `Clone`
+///  and `Send` + `Sync` for bulk operations. The id will be cloned and stored in every band,
+///  so it is best to use small ids. Integer makes a great id for `MinHashIndex`. For [`String`] ids
+/// use `Rc<String>` or `Arc<String>`
+/// `C`: The type of the [`IdContainer`] used to store ids in a band.
 /// # Examples
 ///
 /// ```
@@ -650,7 +657,8 @@ where
         ids_distances[0..std::cmp::min(ids_distances.len(), k)].to_vec()
     }
 
-    /// Removes a key from the index, returning true if the key
+
+    /// Removes an id from the index, returning the signature at the id if the id
     /// was previously in the index.
     ///
     ///
@@ -666,30 +674,29 @@ where
     /// let signature1 = minhasher.create_signature(whitespace_split("This is the first minhashed document"));
     /// let signature2 = minhasher.create_signature(whitespace_split("This is the second minhashed document"));
     /// let query = signature1.clone();
-    /// index.insert(1u32, signature1);
-    /// index.insert(2u32, signature2);
+    /// index.insert(1u32, signature1.clone());
+    /// index.insert(2u32, signature2.clone());
     /// let mut result =  index.query_owned(&query).into_iter().collect::<Vec<_>>();
     /// result.sort();
     /// assert_eq!(result, vec![1, 2]);
-    /// assert_eq!(index.remove(&1), true);
-    /// assert_eq!(index.remove(&1), false);
+    /// assert_eq!(index.remove(&1), Some(signature1));
+    /// assert_eq!(index.remove(&1), None);
     /// ```
-    pub fn remove(&mut self, id: &Id) -> bool {
-        let removed = match self.id_signatures.get(id) {
-            Some(hashes) => {
+    pub fn remove(&mut self, id: &Id) -> Option<Vec<T>> {
+        match self.id_signatures.remove(id) {
+            Some(signature) => {
                 self
                     .bands
                     .iter_mut()
-                    .for_each(|band| band.remove(id, hashes));
-                self.id_signatures.remove(id);
-                true
+                    .for_each(|band| band.remove(id, &signature));
+                Some(signature)
             }
-            None => false,
-        };
-        removed
+            None => None
+        }
     }
 
-    pub fn bulk_remove(&mut self, ids: &Vec<Id>)
+    // Removes signatures for the specified ids. Returns removed signatures
+    pub fn bulk_remove(&mut self, ids: &Vec<Id>) -> Vec<Vec<T>>
         where
             Id: Hash + Eq + Clone + Send + Sync,
             T: Send + Sync {
@@ -702,6 +709,7 @@ where
                 sigs.iter().zip(ids)
                     .for_each(|(sig, id)| band.remove(id, sig))
             });
+        sigs
     }
 
     pub fn size(&self) -> usize {
