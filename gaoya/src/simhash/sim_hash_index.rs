@@ -171,6 +171,15 @@ where
         self.id_signatures.shrink_to_fit();
     }
 
+    pub fn query_one(&self, query_signature: &S) -> Option<(&Id, usize)> {
+        let match_ids = self.query(query_signature);
+        match_ids.into_iter()
+            .map(|id| (id, self.id_signatures.get(&id)))
+            .filter(|(id, sig)| sig.is_some())
+            .map(|(id, sig)| (id, sig.unwrap().hamming_distance(query_signature)))
+            .min_by(|x, y| x.1.cmp(&y.1))
+    }
+
     pub fn query(&self, query_signature: &S) -> AHashSet<&Id> {
         let mut match_ids = AHashSet::with_capacity(10);
         for table in &self.hash_tables {
