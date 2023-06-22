@@ -274,6 +274,13 @@ where
 /// Configuration parameters to [`MinHashIndex::new`](struct.MinHashIndex.html#method.new)
 /// `num_bands` and `band_width` correspond to `b` and `r` in MMDS book.
 ///
+/// # Type Parameters
+/// `T`: The type of the individual hash in the signature
+/// `Id`: The type of id associated with each signature. The type can be any `Hash` + `Eq` + `Clone`
+///  and `Send` + `Sync` for bulk operations. The id will be cloned and stored in every band,
+///  so it is best to use small ids. Integer makes a great id for `MinHashIndex`. For [`String`] ids
+/// use `Rc<String>` or `Arc<String>`
+/// `C`: The type of the [`IdContainer`] used to store ids in a band.
 /// # Examples
 ///
 /// ```
@@ -650,7 +657,8 @@ where
         ids_distances[0..std::cmp::min(ids_distances.len(), k)].to_vec()
     }
 
-    /// Removes a key from the index, returning true if the key
+
+    /// Removes an id from the index, returning the signature at the id if the id
     /// was previously in the index.
     ///
     ///
@@ -676,17 +684,18 @@ where
     /// ```
     pub fn remove(&mut self, id: &Id) -> Option<Vec<T>> {
         match self.id_signatures.remove(id) {
-            Some(hashes) => {
+            Some(signature) => {
                 self
                     .bands
                     .iter_mut()
-                    .for_each(|band| band.remove(id, &hashes));
-                Some(hashes)
+                    .for_each(|band| band.remove(id, &signature));
+                Some(signature)
             }
             None => None
         }
     }
 
+    // Removes signatures for the specified ids. Returns removed signatures
     pub fn bulk_remove(&mut self, ids: &Vec<Id>) -> Vec<Vec<T>>
         where
             Id: Hash + Eq + Clone + Send + Sync,

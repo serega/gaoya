@@ -4,7 +4,7 @@ from .gaoya import minhash as m
 
 class MinHashStringIndex:
     """
-    MinHashStringIndex for indexing and searching text documents based jaccard similarity.
+    MinHashStringIndex for indexing and searching text documents (strings) on jaccard similarity.
 
 
     Reference: `Chapter 3, Mining of Massive Datasets <http://www.mmds.org/>`
@@ -54,10 +54,10 @@ class MinHashStringIndex:
         Only applies if `analyzer` is not callable.
 
     id_container: str, default="set"
-        The data structure used as a bucket to hold ids of documents.
-        When efficient removals required use set.
-        When removals are not required or rare use vec.
-        When the number of similar documents (duplicates) is expected to be small use smallvec which
+        The data structure used as a bucket to hold ids of documents in bands.
+        When efficient removals required use "set".
+        When removals are not required or rare use "vec"
+        When the number of similar documents (near duplicates) is expected to be small use "smallvec" which
         can store up to two ids inline without allocation, which reduces memory usage
         and improves performamance.
 
@@ -127,7 +127,7 @@ class MinHashStringIndex:
         type = constructors[hash_size][id_container]
         self.minhash_index = type(jaccard_threshold, num_bands, band_size, num_hashes, analyzer, lowercase, ngram_range)
 
-    def insert_document(self, id, doc):
+    def insert_document(self, id: int, doc: str):
         """
         Inserts a document `doc` with id `id` into the index.
 
