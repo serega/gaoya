@@ -246,33 +246,54 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::process::id;
     use super::SimHashIndex;
     use crate::simhash::sim_hash::SimHash;
     use crate::simhash::sim_hasher::SimSipHasher64;
     use rand::distributions::{Distribution, Uniform};
     use rand::{thread_rng, Rng};
+    use crate::simhash::SimHashBits;
 
     #[test]
     pub fn test_simhash_index() {
+        let sim_hash = SimHash::<SimSipHasher64, u64, 64>::new(SimSipHasher64::new(5, 6));
         let mut sim_hash_index = SimHashIndex::<u64, usize>::new(8, 6);
-        let doc = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let doc = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 
-        let rand_range = Uniform::from(1..1000);
+        let index_range = Uniform::from(0..20);
+        let value_range = Uniform::from(1..1000);
         let mut rng = thread_rng();
         let mut docs = Vec::new();
-        for i in 0..10 {
+        for i in 0..100 {
             let mut doc1 = doc.clone();
-            doc1[0] = rand_range.sample(&mut rng);
+            let index = index_range.sample(&mut rng);
+            doc1[index] = value_range.sample(&mut rng);
             docs.push((i, doc1));
         }
 
-        let sim_hash = SimHash::<SimSipHasher64, u64, 64>::new(SimSipHasher64::new(5, 6));
-        for doc in docs {
-            let signature = sim_hash.create_signature(doc.1.iter());
-            sim_hash_index.insert(doc.0, signature);
+        let mut id_signatures = Vec::new();
+
+        for (id, doc) in docs {
+            let signature = sim_hash.create_signature(doc.iter());
+            sim_hash_index.insert(id, signature.clone());
+            id_signatures.push((id, signature));
         }
 
-        let result = sim_hash_index.query(&sim_hash.create_signature(doc.iter()));
-        println!("{:?}", result);
+        let target_signature = sim_hash.create_signature(doc.iter());
+
+        // Find the item with minimal distance to doc_signature using linear search
+        let expected = id_signatures.iter().map(|(id, signature)| {
+            let distance = signature.hamming_distance(&target_signature);
+            (id, distance)
+        }).min_by(|x, y| x.1.cmp(&y.1)).unwrap();
+
+        // Find the item with minimal distance to doc_signature using index
+        // ID may not match because there could be multiple documents with the same minimal distance
+        // to the target, but the distance must be the same
+
+        let (id, distance) = sim_hash_index.query_one(
+            &sim_hash.create_signature(doc.iter())).unwrap();
+
+        assert_eq!(expected.1, distance);
     }
 }

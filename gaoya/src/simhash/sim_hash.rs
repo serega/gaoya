@@ -89,22 +89,16 @@ mod tests {
     use crate::simhash::SimHashBits;
     use crate::text::whitespace_split;
 
-    static S1: &'static str = "Returns the number of bits necessary to represent an integer in binary, excluding the sign and leading zero";
-    static S2: &'static str = "Returns the number of bits necessary to represent an integer in binary, excluding the sign and leading zero bit";
-    static S3: &'static str = "local sensitive hashing is awesome";
+    static S1: &'static str = "SimHash is a technique used for detecting near-duplicates or for locality sensitive hashing. It was developed by Moses Charikar and is often used in large-scale applications to reduce the dimensionality of high-dimensional data, making it easier to process";
 
-    static S5: &'static str = "At the time of writing this article, the named tensor functionality is in experimental mode";
-    static S6: &'static str = "At the time of writing this article, the named tensor functionality is in experimental mode";
-
+    static S2: &'static str = "SimHash is a technique used for detecting near-duplicates or for locality sensitive hashing. It was developed by Moses Charikar and is often utilized in large-scale applications to reduce the dimensionality of high-dimensional data, making it easier to analyze";
+    
     #[test]
     pub fn test_sim_hash_basics() {
         let sim_hash = SimHash::<ShaHasher64, u64, 64>::new(ShaHasher64::new());
         let s1 = sim_hash.create_signature(whitespace_split(S1));
         let s2 = sim_hash.create_signature(whitespace_split(S2));
-        println!("{:b}", s1);
-        println!("{:b}", s2);
-
-        println!("s1 {} s2  {} distance {}", s1, s2, s1.hamming_distance(&s2));
+        assert!(s1.hamming_distance(&s2) < 8);
     }
 
     #[test]
@@ -112,9 +106,7 @@ mod tests {
         let sim_hash = SimHash::<SimSipHasher128, u128, 128>::new(SimSipHasher128::new(1, 2));
         let s1 = sim_hash.create_signature(whitespace_split(S1));
         let s2 = sim_hash.create_signature(whitespace_split(S2));
-        println!("{:b}", s1);
-        println!("{:b}", s1);
-        println!("s1 {} s2  {} distance {}", s1, s2, s1.hamming_distance(&s2));
+        assert!(s1.hamming_distance(&s2) < 13);
     }
 
 }
