@@ -69,6 +69,12 @@ macro_rules! py_simhash_index {
                 self.sim_hash.create_signature(tokens.iter())
             }
 
+            pub fn par_bulk_tokens2signatures(&self, docs_tokens: Vec<Vec<&str>>) -> Vec<$type> {
+                docs_tokens.par_iter()
+                    .map(|tokens| self.tokens2signature(tokens.to_vec()))
+                    .collect()
+            }
+
             fn doc2signature(&self, doc: &str) -> $type {
                 if self.lowercase {
                     let doc = doc.to_lowercase();
@@ -98,6 +104,10 @@ macro_rules! py_simhash_index {
 
             pub fn insert_sig(&mut self, id: i64, signature: $type) {
                 self.inner.insert(id, signature);
+            }
+
+            pub fn par_bulk_insert_sig_pairs(&mut self, id_signature_pairs: Vec<(i64, $type)>) {
+                self.inner.par_bulk_insert_pairs(id_signature_pairs);
             }
 
             pub fn par_bulk_insert_tokens(&mut self, ids: Vec<i64>, docs_tokens: Vec<Vec<&str>>) {
