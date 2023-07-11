@@ -92,6 +92,10 @@ macro_rules! py_simhash_index {
                     .insert(id, self.sim_hash.create_signature(tokens.iter()));
             }
 
+            pub fn insert_sig(&mut self, id: i64, signature: $type) {
+                self.inner.insert(id, signature);
+            }
+
             pub fn par_bulk_insert_tokens(&mut self, ids: Vec<i64>, docs_tokens: Vec<Vec<&str>>) {
                 let signatures = docs_tokens
                     .par_iter()
@@ -138,6 +142,20 @@ macro_rules! py_simhash_index {
                     .collect()
             }
 
+            pub fn query_one(&mut self, signature: $type) -> Option<(i64, usize)> {
+                self.inner.query_one(&signature).map(|(id_ref, distance)| (*id_ref, distance))
+            }
+            pub fn query_sig(&self, signature: $type) -> Vec<i64> {
+                self.inner
+                    .query(&signature)
+                    .into_iter()
+                    .map(|id_ref| id_ref.clone())
+                    .collect()
+            }
+            pub fn query_sig_return_distance(&self, signature: $type) -> Vec<(i64, usize)> {
+                self.inner.query_return_distance(&signature)
+            }
+
             pub fn query_tokens_return_distance(&self, tokens: Vec<&str>) -> Vec<(i64, usize)> {
                 let signature = self.sim_hash.create_signature(tokens.iter());
                 self.inner.query_return_distance(&signature)
@@ -162,6 +180,18 @@ macro_rules! py_simhash_index {
                     .collect();
                 self.inner.par_bulk_query_return_distance(&signatures)
             }
+
+            pub fn size(&self) -> usize {
+                self.inner.size()
+            }
+            // pub fn inner(&self) -> &gaoya::simhash::SimHashIndex<$type, i64> {
+            //     &self.inner
+            // }
+
+
+            // pub fn remove(&mut self, id: i64) {
+            //     self.inner.remove(&id);
+            // }
 
         }
 
