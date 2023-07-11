@@ -65,6 +65,10 @@ macro_rules! py_simhash_index {
                 }
             }
 
+            pub fn tokens2signature(&self, tokens: Vec<&str>) -> $type {
+                self.sim_hash.create_signature(tokens.iter())
+            }
+
             fn doc2signature(&self, doc: &str) -> $type {
                 if self.lowercase {
                     let doc = doc.to_lowercase();
@@ -183,6 +187,10 @@ macro_rules! py_simhash_index {
 
             pub fn size(&self) -> usize {
                 self.inner.size()
+            }
+
+            pub fn iter(&self) -> Vec<(i64, $type)> {
+                self.inner.iter().map(|(id, sig)| (*id, *sig)).collect()
             }
             // pub fn inner(&self) -> &gaoya::simhash::SimHashIndex<$type, i64> {
             //     &self.inner
