@@ -118,6 +118,24 @@ macro_rules! py_simhash_index {
                 self.inner.par_bulk_insert(ids, signatures);
             }
 
+                // call map use self.insert_tokens
+            pub fn par_bulk_insert_tokens_pairs(&mut self, docs_id_tokens: Vec<(i64, Vec<&str>)>) {
+                // docs_id_tokens.par_iter()
+                //     .map(|(id, tokens)|  self.inner.insert(*id, self.sim_hash.create_signature(tokens.iter())) )
+                //     .collect()
+                if docs_id_tokens.len() < 100 {
+                    for (id, tokens) in docs_id_tokens.iter() {
+                        self.insert_tokens(*id, tokens.to_vec())
+                    }
+                } else {
+                    let id_signatures = docs_id_tokens
+                        .par_iter()
+                        .map(|(id, tokens)| (*id, self.tokens2signature(tokens.to_vec())))
+                        .collect();
+                    self.par_bulk_insert_sig_pairs(id_signatures);
+                }
+            }
+
 
             pub fn par_bulk_insert_docs(&mut self, ids: Vec<i64>, docs: Vec<&str>) {
                 if ids.len() < 100 {
