@@ -225,7 +225,11 @@ where
     }
 
     pub fn size(&self) -> usize {
-        self.size
+        self.id_signatures.len()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&Id, &S)> {
+        self.id_signatures.iter()
     }
 
     fn avg_bucket_count(&self) -> usize {

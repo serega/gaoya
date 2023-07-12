@@ -65,6 +65,16 @@ macro_rules! py_simhash_index {
                 }
             }
 
+            pub fn tokens2signature(&self, tokens: Vec<&str>) -> $type {
+                self.sim_hash.create_signature(tokens.iter())
+            }
+
+            pub fn par_bulk_tokens2signatures(&self, docs_tokens: Vec<Vec<&str>>) -> Vec<$type> {
+                docs_tokens.par_iter()
+                    .map(|tokens| self.tokens2signature(tokens.to_vec()))
+                    .collect()
+            }
+
             fn doc2signature(&self, doc: &str) -> $type {
                 if self.lowercase {
                     let doc = doc.to_lowercase();
@@ -92,12 +102,38 @@ macro_rules! py_simhash_index {
                     .insert(id, self.sim_hash.create_signature(tokens.iter()));
             }
 
+            pub fn insert_sig(&mut self, id: i64, signature: $type) {
+                self.inner.insert(id, signature);
+            }
+
+            pub fn par_bulk_insert_sig_pairs(&mut self, id_signature_pairs: Vec<(i64, $type)>) {
+                self.inner.par_bulk_insert_pairs(id_signature_pairs);
+            }
+
             pub fn par_bulk_insert_tokens(&mut self, ids: Vec<i64>, docs_tokens: Vec<Vec<&str>>) {
                 let signatures = docs_tokens
                     .par_iter()
                     .map(|tokens| self.sim_hash.create_signature(tokens.iter()))
                     .collect();
                 self.inner.par_bulk_insert(ids, signatures);
+            }
+
+                // call map use self.insert_tokens
+            pub fn par_bulk_insert_tokens_pairs(&mut self, docs_id_tokens: Vec<(i64, Vec<&str>)>) {
+                // docs_id_tokens.par_iter()
+                //     .map(|(id, tokens)|  self.inner.insert(*id, self.sim_hash.create_signature(tokens.iter())) )
+                //     .collect()
+                if docs_id_tokens.len() < 100 {
+                    for (id, tokens) in docs_id_tokens.iter() {
+                        self.insert_tokens(*id, tokens.to_vec())
+                    }
+                } else {
+                    let id_signatures = docs_id_tokens
+                        .par_iter()
+                        .map(|(id, tokens)| (*id, self.tokens2signature(tokens.to_vec())))
+                        .collect();
+                    self.par_bulk_insert_sig_pairs(id_signatures);
+                }
             }
 
 
@@ -138,6 +174,20 @@ macro_rules! py_simhash_index {
                     .collect()
             }
 
+            pub fn query_one(&mut self, signature: $type) -> Option<(i64, usize)> {
+                self.inner.query_one(&signature).map(|(id_ref, distance)| (*id_ref, distance))
+            }
+            pub fn query_sig(&self, signature: $type) -> Vec<i64> {
+                self.inner
+                    .query(&signature)
+                    .into_iter()
+                    .map(|id_ref| id_ref.clone())
+                    .collect()
+            }
+            pub fn query_sig_return_distance(&self, signature: $type) -> Vec<(i64, usize)> {
+                self.inner.query_return_distance(&signature)
+            }
+
             pub fn query_tokens_return_distance(&self, tokens: Vec<&str>) -> Vec<(i64, usize)> {
                 let signature = self.sim_hash.create_signature(tokens.iter());
                 self.inner.query_return_distance(&signature)
@@ -162,6 +212,32 @@ macro_rules! py_simhash_index {
                     .collect();
                 self.inner.par_bulk_query_return_distance(&signatures)
             }
+
+            pub fn par_bulk_query_sigs_return_similarity(&self, signatures: Vec<$type>) -> Vec<Vec<(i64, usize)>> {
+                self.inner.par_bulk_query_return_distance(&signatures)
+            }
+            pub fn par_bulk_query_sigs(&self, signatures: Vec<$type>) -> Vec<Vec<i64>> {
+                self.inner.par_bulk_query(&signatures)
+                    .into_iter()
+                    .map(|set| set.into_iter().collect())
+                    .collect()
+            }
+
+            pub fn size(&self) -> usize {
+                self.inner.size()
+            }
+
+            pub fn iter(&self) -> Vec<(i64, $type)> {
+                self.inner.iter().map(|(id, sig)| (*id, *sig)).collect()
+            }
+            // pub fn inner(&self) -> &gaoya::simhash::SimHashIndex<$type, i64> {
+            //     &self.inner
+            // }
+
+
+            // pub fn remove(&mut self, id: i64) {
+            //     self.inner.remove(&id);
+            // }
 
         }
 
