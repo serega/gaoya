@@ -216,6 +216,12 @@ macro_rules! py_simhash_index {
             pub fn par_bulk_query_sigs_return_similarity(&self, signatures: Vec<$type>) -> Vec<Vec<(i64, usize)>> {
                 self.inner.par_bulk_query_return_distance(&signatures)
             }
+            pub fn par_bulk_query_sigs(&self, signatures: Vec<$type>) -> Vec<Vec<i64>> {
+                self.inner.par_bulk_query(&signatures)
+                    .into_iter()
+                    .map(|set| set.into_iter().collect())
+                    .collect()
+            }
 
             pub fn size(&self) -> usize {
                 self.inner.size()
