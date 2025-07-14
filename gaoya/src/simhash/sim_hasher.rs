@@ -2,6 +2,7 @@ use siphasher::sip::SipHasher;
 use siphasher::sip128::{Hasher128, SipHasher as SipHasher128};
 use std::hash::{Hash, Hasher};
 use crate::minhash::Sha1Hasher;
+use xxhash_rust::xxh3::Xxh3;
 
 pub trait SimHasher: Sized {
     type T;
@@ -86,5 +87,48 @@ impl SimHasher for SimSipHasher128 {
         let mut sip = SipHasher128::new_with_keys(self.key1, self.key2);
         item.hash(&mut sip);
         sip.finish128().as_u128()
+    }
+}
+
+pub struct Xxh3Hasher64;
+
+impl Xxh3Hasher64 {
+    #[inline]
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl SimHasher for Xxh3Hasher64 {
+    type T = u64;
+
+    #[inline]
+    fn hash<U>(&self, item: &U) -> Self::T
+    where
+        U: Hash,
+    {
+        let mut h = Xxh3::new();
+        item.hash(&mut h);
+        h.finish()
+    }
+}
+
+pub struct Xxh3Hasher128;           // no fields
+
+impl Xxh3Hasher128 {
+    pub fn new() -> Self { Self }
+}
+
+impl SimHasher for Xxh3Hasher128 {
+    type T = u128;
+
+    #[inline]
+    fn hash<U>(&self, item: &U) -> Self::T
+    where
+        U: Hash,
+    {
+        let mut h = Xxh3::new();    // default seed = 0
+        item.hash(&mut h);
+        h.digest128()               // returns u128 directly (crate ≥ 1.2)
     }
 }

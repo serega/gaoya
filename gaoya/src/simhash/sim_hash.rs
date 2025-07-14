@@ -83,12 +83,14 @@ where
 #[cfg(test)]
 mod tests {
     use num_traits::real::Real;
+    use crate::simhash::BitArray;
     use super::SimHash;
     use crate::simhash::sim_hasher::SimSipHasher128;
     use crate::simhash::sim_hasher::{ShaHasher64, SimSipHasher64};
     use crate::simhash::SimHashBits;
     use crate::text::whitespace_split;
-
+    use crate::simhash::sim_hasher::{Xxh3Hasher64, Xxh3Hasher128};
+    use std::time::Instant;
     static S1: &'static str = "SimHash is a technique used for detecting near-duplicates or for locality sensitive hashing. It was developed by Moses Charikar and is often used in large-scale applications to reduce the dimensionality of high-dimensional data, making it easier to process";
 
     static S2: &'static str = "SimHash is a technique used for detecting near-duplicates or for locality sensitive hashing. It was developed by Moses Charikar and is often utilized in large-scale applications to reduce the dimensionality of high-dimensional data, making it easier to analyze";
@@ -108,5 +110,48 @@ mod tests {
         let s2 = sim_hash.create_signature(whitespace_split(S2));
         assert!(s1.hamming_distance(&s2) < 13);
     }
+    #[test]
+    pub fn test_sim_hash_xxh3_64() {
+        let sim_hash = SimHash::<Xxh3Hasher64, u64, 64>::new(Xxh3Hasher64::new());
+        let s1 = sim_hash.create_signature(whitespace_split(S1));
+        let s2 = sim_hash.create_signature(whitespace_split(S2));
+        assert!(s1.hamming_distance(&s2) < 8);       // expect ~12% diff
+    }
 
+    #[test]
+    pub fn test_sim_hash_xxh3_128() {
+        let sim_hash = SimHash::<Xxh3Hasher128, u128, 128>::new(Xxh3Hasher128::new());
+        let s1 = sim_hash.create_signature(whitespace_split(S1));
+        let s2 = sim_hash.create_signature(whitespace_split(S2));
+        assert!(s1.hamming_distance(&s2) < 15);      // ≈12 % of 128 bits
+    }
+    #[test]
+    fn simhash_large() {
+        use rand::{Rng, SeedableRng};
+        use rand::rngs::StdRng;
+
+        // Helper identical to the small test
+        fn whitespace_split(s: &str) -> impl Iterator<Item = &str> { s.split_whitespace() }
+        const N: usize = 10_000;
+        let mut rng = StdRng::seed_from_u64(42);
+
+        // Make two vectors that are complements in half their bits.
+        let data1: Vec<u8> = (0..N).map(|_| rng.gen_range(0..2)).collect();
+        let mut data2 = data1.clone();
+        for i in (0..N).step_by(4) {
+            data2[i] = 1 - data2[i];
+        }
+
+        let sim_hash = SimHash::<Xxh3Hasher128, u128, 128>::new(Xxh3Hasher128::new());
+        let t1 = Instant::now();
+        let h1 = sim_hash.create_signature((0..N).map(|i| (i as u64, data1[i])));
+        let h2 = sim_hash.create_signature((0..N).map(|i| (i as u64, data2[i])));
+        let dur = t1.elapsed();
+        println!("SimHash: {:?}", dur);
+        let hd = h1.hamming_distance(&h2);
+        println!("Estimated bit difference: {}", hd);
+
+        assert!(h1.hamming_distance(&h2) < 51);
+
+    }
 }

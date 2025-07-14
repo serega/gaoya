@@ -10,8 +10,7 @@ license = "MIT"
 keywords = ["lsh",  "neardup", "dedup"]
 description = "Locality Sensitive Hashing Data Structures"
 
-[dev-dependencies]
-criterion = { version = "0.5.1", features = ["html_reports"] }
+
 
 [[bench]]
 name = "lsh_bench"
@@ -43,6 +42,12 @@ smallvec = { version = "1.10.0", features = ["const_generics", "const_new", "ser
 crossbeam-utils = "0.8.15"
 triomphe = "0.1.8"
 fnv = "1.0.7"
+xxhash-rust = { version = "0.8.15", default-features = false, features = ["xxh3"] }
+rand_core = "0.9.3"
+rand_xoshiro = "0.7.0"
+
+[dev-dependencies]
+criterion = { version = "0.5.1", features = ["html_reports"] }
 
 [features]
 unstable = []
