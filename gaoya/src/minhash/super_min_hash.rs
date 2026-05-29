@@ -5,10 +5,11 @@
 use std::cmp::min;
 use std::hash::{BuildHasher, Hash, Hasher};
 use fnv::FnvBuildHasher;
-use rand::distributions::{Distribution, Uniform};
+use rand;
 use rand::prelude::{SliceRandom, StdRng};
-use rand::SeedableRng;
+use rand::{RngExt, SeedableRng};
 use crate::minhash::MinHasher;
+use rand::distr::Distribution;
 
 pub struct SuperMinHasher32V1<B: BuildHasher> {
     build_hasher: B,
@@ -47,7 +48,7 @@ impl<B: BuildHasher> MinHasher for SuperMinHasher32V1<B> {
             let mut rng = StdRng::seed_from_u64(h);
             let mut p: Vec<u32> = (0..(self.num_hashes) as u32).collect();
             p.shuffle(&mut rng);
-            let rand_range = Uniform::from(0f32..1.0f32);
+            let mut rand_range = rand::distr::Uniform::new(0f32, 1.0f32).unwrap();
             for j in (0..self.num_hashes) {
                 let r = rand_range.sample(&mut rng);
                 let x = minhash[j].min(r + p[j] as f32);
@@ -90,7 +91,7 @@ impl<B: BuildHasher> MinHasher for SuperMinHash32V2<B> {
         let mut h = vec![99999999f32; self.num_hashes];
         let m = self.num_hashes;
         let mut a = m - 1;
-        let unit_range = Uniform::<f32>::new(0., 1.);
+        let unit_range = rand::distr::Uniform::<f32>::new(0., 1.).unwrap();
         let mut q = vec![0; m];
         let mut p: Vec<usize> = vec![0; m];
         let mut b: Vec<isize> = vec![-1; m];
@@ -103,8 +104,8 @@ impl<B: BuildHasher> MinHasher for SuperMinHash32V2<B> {
             let mut j: usize = 0;
             let i = item.0;
             while j <= a {
-                let r: f32 = unit_range.sample(&mut rng);
-                let k = Uniform::<usize>::new(j, m).sample(&mut rng);
+                let r: f32 = rng.sample(unit_range);
+                let k = rng.sample(rand::distr::Uniform::<usize>::new(j, m).unwrap());
                 if q[j] != i {
                     q[j] = i;
                     p[j] = j;

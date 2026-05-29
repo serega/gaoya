@@ -1,8 +1,8 @@
 [package]
 name = "pygaoya"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Sergey Melderis <sergey.melderis@gmail.com>"]
-edition = "2021"
+edition = "2024"
 license = "MIT"
 homepage = "https://github.com/serega/gaoya"
 repository = "https://github.com/serega/gaoya"
@@ -19,9 +19,9 @@ disable-publish = true
 
 
 [dependencies]
-libc = "0.2.106"
-pyo3 = { version = "0.18.3", features = ["extension-module", "abi3-py37"] }
-rayon = "1.7.0"
+libc = "0.2.146"
+pyo3 = { version = "0.28.3", features = ["extension-module", "abi3-py39"] }
+rayon = "1.12.0"
 shingles = "0.1.1"
 fnv = "1.0.7"
 
@@ -32,28 +32,9 @@ path = "../gaoya"
 [dev-dependencies]
 tempfile = "3.2.0"
 
-[target.x86_64-apple-darwin]
-rustflags = [
-    "-C", "link-arg=-undefined",
-    "-C", "link-arg=dynamic_lookup",
-]
-
-[profile.release]
-# Enable link-time optimization, eliminates more code and inlines across crate boundaries.
-# Default: false
-lto = "fat"
-
-# codegen-units of 1 gives best optimization, but disables parallel building.
-# Default: 16
-#codegen-units = 1
-
-# Includes debug information in release builds. Necessary for profiling. Does not
-# slow down the executable.
-# debug = true
-
-# The default optimization level is 3 for release mode builds.
-# 0 means disable optimization and is the default for debug mode buids.
-# (Setting opt-level=1 for debug builds is a good way of speeding them up a bit.)
-# "s" means optimize for size, "z" reduces size even more.
-opt-level = 3
+# NOTE: the macOS dynamic_lookup linker flags live in ../.cargo/config.toml,
+# because rustflags is not honored under [target.*] in Cargo.toml.
+#
+# The release profile (lto = "fat", opt-level = 3) is defined at the workspace
+# root (../Cargo.toml); a [profile.*] table here would be ignored.
 

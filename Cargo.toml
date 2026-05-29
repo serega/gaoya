@@ -1,6 +1,17 @@
 [workspace]
+resolver = "2"
 
 members = [
     "gaoya",
     "py-gaoya",
 ]
+
+# In a virtual workspace, profiles MUST live at the root — per-member
+# [profile.*] tables are silently ignored. This is what gives release wheels
+# their cross-crate LTO.
+[profile.release]
+lto = "fat"
+opt-level = 3
+# `debug = true` was previously set on the gaoya crate but was inert (ignored in
+# a virtual workspace). Left off here to keep published wheels small; if you need
+# profiling symbols for `cargo bench`, set `debug = "line-tables-only"`.

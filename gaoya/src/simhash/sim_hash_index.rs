@@ -250,8 +250,8 @@ mod tests {
     use super::SimHashIndex;
     use crate::simhash::sim_hash::SimHash;
     use crate::simhash::sim_hasher::SimSipHasher64;
-    use rand::distributions::{Distribution, Uniform};
-    use rand::{thread_rng, Rng};
+    use rand::distr::{Distribution, Uniform};
+    use rand::Rng;
     use crate::simhash::SimHashBits;
 
     #[test]
@@ -260,9 +260,9 @@ mod tests {
         let mut sim_hash_index = SimHashIndex::<u64, usize>::new(8, 6);
         let doc = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 
-        let index_range = Uniform::from(0..20);
-        let value_range = Uniform::from(1..1000);
-        let mut rng = thread_rng();
+        let index_range = Uniform::new(0, 20).unwrap();
+        let value_range = Uniform::new(1, 1000).unwrap();
+        let mut rng = rand::rng();
         let mut docs = Vec::new();
         for i in 0..100 {
             let mut doc1 = doc.clone();

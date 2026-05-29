@@ -1,4 +1,5 @@
 use pyo3::prelude::*;
+use pyo3::types::{PyModule, PyModuleMethods};
 extern crate gaoya;
 use self::gaoya::simhash::SimSipHasher128;
 use gaoya::simhash::{SimHash, SimHashIndex, SimSipHasher64};
@@ -74,7 +75,7 @@ macro_rules! py_simhash_index {
                 }
             }
 
-            fn par_bulk_doc2signatures(&self, docs: Vec<&str>) -> Vec<$type> {
+            fn par_bulk_doc2signatures(&self, docs: Vec<String>) -> Vec<$type> {
                 docs.par_iter()
                     .map(|doc| self.doc2signature(&doc))
                     .collect()
@@ -87,12 +88,12 @@ macro_rules! py_simhash_index {
                 self.inner.insert(id, signature);
             }
 
-            pub fn insert_tokens(&mut self, id: i64, tokens: Vec<&str>) {
+            pub fn insert_tokens(&mut self, id: i64, tokens: Vec<String>) {
                 self.inner
                     .insert(id, self.sim_hash.create_signature(tokens.iter()));
             }
 
-            pub fn par_bulk_insert_tokens(&mut self, ids: Vec<i64>, docs_tokens: Vec<Vec<&str>>) {
+            pub fn par_bulk_insert_tokens(&mut self, ids: Vec<i64>, docs_tokens: Vec<Vec<String>>) {
                 let signatures = docs_tokens
                     .par_iter()
                     .map(|tokens| self.sim_hash.create_signature(tokens.iter()))
@@ -101,7 +102,7 @@ macro_rules! py_simhash_index {
             }
 
 
-            pub fn par_bulk_insert_docs(&mut self, ids: Vec<i64>, docs: Vec<&str>) {
+            pub fn par_bulk_insert_docs(&mut self, ids: Vec<i64>, docs: Vec<String>) {
                 if ids.len() < 100 {
                     for (id, doc) in ids.iter().zip(docs.iter()) {
                         self.insert_document(*id, doc)
@@ -129,7 +130,7 @@ macro_rules! py_simhash_index {
                 self.inner.query_return_distance(&signature)
             }
 
-            pub fn query_tokens(&self, tokens: Vec<&str>) -> Vec<i64> {
+            pub fn query_tokens(&self, tokens: Vec<String>) -> Vec<i64> {
                 let signature = self.sim_hash.create_signature(tokens.iter());
                 self.inner
                     .query(&signature)
@@ -138,12 +139,12 @@ macro_rules! py_simhash_index {
                     .collect()
             }
 
-            pub fn query_tokens_return_distance(&self, tokens: Vec<&str>) -> Vec<(i64, usize)> {
+            pub fn query_tokens_return_distance(&self, tokens: Vec<String>) -> Vec<(i64, usize)> {
                 let signature = self.sim_hash.create_signature(tokens.iter());
                 self.inner.query_return_distance(&signature)
             }
 
-            pub fn par_bulk_query(&self, docs: Vec<&str>) -> Vec<Vec<i64>> {
+            pub fn par_bulk_query(&self, docs: Vec<String>) -> Vec<Vec<i64>> {
                 let signatures = self.par_bulk_doc2signatures(docs);
                 self.inner.par_bulk_query(&signatures)
                     .into_iter()
@@ -151,12 +152,12 @@ macro_rules! py_simhash_index {
                     .collect()
             }
 
-            pub fn par_bulk_query_return_distance(&self, docs: Vec<&str>) -> Vec<Vec<(i64, usize)>> {
+            pub fn par_bulk_query_return_distance(&self, docs: Vec<String>) -> Vec<Vec<(i64, usize)>> {
                 let signatures = self.par_bulk_doc2signatures(docs);
                 self.inner.par_bulk_query_return_distance(&signatures)
             }
 
-            pub fn par_bulk_query_tokens_return_similarity(&self, doc_tokens: Vec<Vec<&str>>) -> Vec<Vec<(i64, usize)>> {
+            pub fn par_bulk_query_tokens_return_similarity(&self, doc_tokens: Vec<Vec<String>>) -> Vec<Vec<(i64, usize)>> {
                 let signatures = doc_tokens.par_iter()
                     .map(|tokens| self.sim_hash.create_signature(tokens.iter()))
                     .collect();
@@ -171,7 +172,7 @@ macro_rules! py_simhash_index {
 py_simhash_index!(SimHash64StringIntIndex, u64, 64, "64" , SimSipHasher64);
 py_simhash_index!(SimHash128StringIntIndex, u128, 128, "128" , SimSipHasher128);
 
-pub fn init_simhash_module(m: &PyModule) -> PyResult<()> {
+pub fn init_simhash_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SimHash64StringIntIndex>()?;
     m.add_class::<SimHash128StringIntIndex>()?;
     Ok(())

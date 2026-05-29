@@ -1,4 +1,5 @@
 use pyo3::prelude::*;
+use pyo3::types::PyModuleMethods;
 
 
 use crate::TokenizerSpecification;
@@ -104,7 +105,7 @@ macro_rules! py_minhash_index {
                 }
             }
 
-            pub fn insert_tokens(&mut self, id: i64, tokens: Vec<&str>) {
+            pub fn insert_tokens(&mut self, id: i64, tokens: Vec<String>) {
                 self.inner
                     .insert(id, self.min_hash.create_signature(tokens.iter()));
             }
@@ -113,7 +114,7 @@ macro_rules! py_minhash_index {
                 self.inner.remove(&id);
             }
 
-            fn bulk_hash_docs(&self, docs: Vec<&str>) -> Vec<Vec<$type>> {
+            fn bulk_hash_docs(&self, docs: Vec<String>) -> Vec<Vec<$type>> {
                 docs.par_iter()
                 .map(|doc| {
                     if self.lowercase {
@@ -126,7 +127,7 @@ macro_rules! py_minhash_index {
                 .collect()
             }
 
-            pub fn par_bulk_insert_docs(&mut self, ids: Vec<i64>, docs: Vec<&str>) {
+            pub fn par_bulk_insert_docs(&mut self, ids: Vec<i64>, docs: Vec<String>) {
                 if ids.len() < 100 { // TODO: find a reasonable threshold
                     for (id, doc) in ids.iter().zip(docs.iter()) {
                         self.insert_document(*id, doc)
@@ -137,7 +138,7 @@ macro_rules! py_minhash_index {
                 }
             }
 
-            pub fn bulk_insert_tokens(&mut self, ids: Vec<i64>, tokens: Vec<Vec<&str>>) {
+            pub fn bulk_insert_tokens(&mut self, ids: Vec<i64>, tokens: Vec<Vec<String>>) {
                 for id_tokens in ids.iter().zip(tokens.iter()) {
                     self.inner.insert(
                         *id_tokens.0,
@@ -146,27 +147,27 @@ macro_rules! py_minhash_index {
                 }
             }
 
-            pub fn par_bulk_insert_tokens(&mut self, ids: Vec<i64>, tokens: Vec<Vec<&str>>) {
+            pub fn par_bulk_insert_tokens(&mut self, ids: Vec<i64>, tokens: Vec<Vec<String>>) {
                 let hashes = self.min_hash.bulk_create_signature(&tokens);
                 self.inner.par_bulk_insert(ids, hashes);
             }
 
-            pub fn query_tokens(&self, tokens: Vec<&str>) -> Vec<i64> {
+            pub fn query_tokens(&self, tokens: Vec<String>) -> Vec<i64> {
                 let signature = &self.min_hash.create_signature(tokens.iter());
                 self.inner.query_owned(signature).into_iter().collect()
             }
 
-            pub fn query_tokens_return_similarity(&self, tokens: Vec<&str>) ->  Vec<(i64, f64)> {
+            pub fn query_tokens_return_similarity(&self, tokens: Vec<String>) ->  Vec<(i64, f64)> {
                 let signature = &self.min_hash.create_signature(tokens.iter());
                 self.inner.query_owned_return_similarity(&signature)
             }
 
-            pub fn query(&self, doc: &str) -> Vec<i64> {
+            pub fn query(&self, doc: String) -> Vec<i64> {
                 let signature = if self.lowercase {
                     let doc = doc.to_lowercase();
                     self.tokenize_and_minhash(doc.as_str())
                 } else {
-                    self.tokenize_and_minhash(doc)
+                    self.tokenize_and_minhash(doc.as_str())
                 };
                 self.inner
                     .query_owned(&signature)
@@ -174,17 +175,17 @@ macro_rules! py_minhash_index {
                     .collect()
             }
 
-            pub fn query_return_similarity(&self, doc: &str) -> Vec<(i64, f64)> {
+            pub fn query_return_similarity(&self, doc: String) -> Vec<(i64, f64)> {
                 let signature = if self.lowercase {
                     let doc = doc.to_lowercase();
                     self.tokenize_and_minhash(doc.as_str())
                 } else {
-                    self.tokenize_and_minhash(doc)
+                    self.tokenize_and_minhash(doc.as_str())
                 };
                 self.inner.query_owned_return_similarity(&signature)
             }
 
-            pub fn par_bulk_query(&self, docs: Vec<&str>) -> Vec<Vec<i64>> {
+            pub fn par_bulk_query(&self, docs: Vec<String>) -> Vec<Vec<i64>> {
                 let signatures = self.bulk_hash_docs(docs);
                 self.inner.par_bulk_query(&signatures)
                     .into_iter()
@@ -192,13 +193,13 @@ macro_rules! py_minhash_index {
                     .collect()
             }
 
-            pub fn par_bulk_query_return_similarity(&self, docs: Vec<&str>) -> Vec<Vec<(i64, f64)>> {
+            pub fn par_bulk_query_return_similarity(&self, docs: Vec<String>) -> Vec<Vec<(i64, f64)>> {
                 let signatures = self.bulk_hash_docs(docs);
                 self.inner.par_bulk_query_return_similarity(&signatures)
             }
 
 
-            pub fn par_bulk_query_tokens(&self, tokens: Vec<Vec<&str>>) -> Vec<Vec<i64>> {
+            pub fn par_bulk_query_tokens(&self, tokens: Vec<Vec<String>>) -> Vec<Vec<i64>> {
                 let signatures = self.min_hash.bulk_create_signature(&tokens);
                 self.inner.par_bulk_query(&signatures)
                     .into_iter()
@@ -206,7 +207,7 @@ macro_rules! py_minhash_index {
                     .collect()
             }
 
-            pub fn par_bulk_query_tokens_return_similarity(&self, tokens: Vec<Vec<&str>>) -> Vec<Vec<(i64, f64)>> {
+            pub fn par_bulk_query_tokens_return_similarity(&self, tokens: Vec<Vec<String>>) -> Vec<Vec<(i64, f64)>> {
                 let signatures = self.min_hash.bulk_create_signature(&tokens);
                 self.inner.par_bulk_query_return_similarity(&signatures)
             }
@@ -252,7 +253,7 @@ py_minhash_index!(MinHash8StringIntIndexSmallVec, u8, "8", SmallVecContaineri64,
 
 
 
-pub fn init_minhash_module(m: &PyModule) -> PyResult<()> {
+pub fn init_minhash_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<MinHash64StringIntIndexHashSet>()?;
     m.add_class::<MinHash64StringIntIndexVec>()?;
     m.add_class::<MinHash64StringIntIndexSmallVec>()?;

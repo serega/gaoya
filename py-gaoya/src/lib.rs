@@ -1,4 +1,5 @@
 use pyo3::prelude::*;
+use pyo3::types::{PyModule, PyModuleMethods};
 
 mod min_hash;
 mod sim_hash;
@@ -8,14 +9,14 @@ use sim_hash::init_simhash_module;
 use crate::TokenizerSpecification::{CharShingle, WhiteSpace, WhiteSpaceShingle};
 
 #[pymodule]
-fn gaoya(py: Python, module: &PyModule) -> PyResult<()> {
+fn gaoya(py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
     let minhash_module = PyModule::new(py, "minhash")?;
-    init_minhash_module(minhash_module)?;
-    module.add_submodule(minhash_module)?;
+    init_minhash_module(&minhash_module)?;
+    module.add_submodule(&minhash_module)?;
 
     let simhash_module = PyModule::new(py, "simhash")?;
-    init_simhash_module(simhash_module)?;
-    module.add_submodule(simhash_module)?;
+    init_simhash_module(&simhash_module)?;
+    module.add_submodule(&simhash_module)?;
     Ok(())
 }
 

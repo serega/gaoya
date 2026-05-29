@@ -4,7 +4,7 @@ use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher};
 
 use crate::minhash::{compute_minhash_similarity, MinHasher, MinHashType};
 use crate::minhash::hashers::{SipHasher24BuildHasher};
-use rand::distributions::{Distribution, Uniform};
+use rand;
 use rand::seq::SliceRandom;
 use rayon::prelude::*;
 use std::cmp::min;
@@ -15,7 +15,8 @@ use fnv::FnvBuildHasher;
 use num_traits::{AsPrimitive, PrimInt};
 use siphasher::sip::{SipHasher, SipHasher24};
 use num_traits as num;
-
+use rand::RngExt;
+use rand::distr::Distribution;
 
 
 macro_rules! make_min_hasher {
@@ -40,8 +41,8 @@ macro_rules! make_min_hasher {
 
             pub fn new_with_hasher_and_seed(num_hashes: usize, build_hasher: B, seed: u64) -> Self {
                 let mut rng = StdRng::seed_from_u64(seed);
-                let rand_range1 = Uniform::from(1..MERSENNE_PRIME_31);
-                let rand_range2 = Uniform::from(0..MERSENNE_PRIME_31);
+                let rand_range1 = rand::distr::Uniform::new(1, MERSENNE_PRIME_31).unwrap();
+                let rand_range2 = rand::distr::Uniform::new(0, MERSENNE_PRIME_31).unwrap();
                 $name {
                     build_hasher,
                     a: (0..num_hashes)
@@ -105,7 +106,7 @@ const MERSENNE_PRIME_31: u32 = (1 << 31) - 1;
 
 
 
-make_min_hasher!(MinHasher32, u32);
+make_min_hasher!(MinHasher32,u32);
 make_min_hasher!(MinHasher16, u16);
 make_min_hasher!(MinHasher8, u8);
 

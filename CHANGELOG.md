@@ -1,4 +1,8 @@
 
+# [0.2.1] - 2023-06-22
+### Changed
+- Updated dependencies
+
 # [0.2.0] - 2023-06-22
 ### Added
 - `IdContainer` trait for storing IDs in MinHashIndex, and three implementations `HashSetContainer`, 
