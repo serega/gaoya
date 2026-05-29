@@ -175,47 +175,6 @@ where
         }
     }
 
-    /// Returns the index of signature that gives highest recall
-    /// of this band on points that are not in all_ids.
-    /// Used by centroid calculation to choose the most optimal
-    /// band portion of the hash
-    // fn find_signature_with_highest_recall<'a>(
-    //     &'a self,
-    //     signatures: &[&[T]],
-    //     all_ids: &mut HashSet<&'a Id>,
-    // ) -> Option<usize> {
-    //     let mut max_count: usize = 0;
-    //     let mut best_index: isize = -1;
-    //     for minhash in signatures.iter().enumerate() {
-    //         let band_data = &minhash.1[self.band_start..self.band_end];
-    //         let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
-    //         match self.hash_table.get(&band_key) {
-    //             Some(ids) => {
-    //                 let new_count = ids.iter()
-    //                     .map(|id| !all_ids.contains(&id) as usize)
-    //                     .count();
-    //                 if new_count > max_count {
-    //                     max_count = new_count;
-    //                     best_index = minhash.0 as isize;
-    //                 }
-    //             }
-    //             None => (),
-    //         }
-    //     }
-    //     let band_data = &signatures[best_index as usize][self.band_start..self.band_end];
-    //     let band_key = BandKey::new(band_data, self.build_ahash.build_hasher());
-    //     match self.hash_table.get(&band_key) {
-    //         Some(ids) => {
-    //             all_ids.extend(ids.iter())
-    //         }
-    //         None => (),
-    //     }
-    //     if best_index >= 0 {
-    //         Some(best_index as usize)
-    //     } else {
-    //         None
-    //     }
-    // }
 
     /// Removes id from the band
     /// Returns true if the band portion of the signature is not in the hashtable
@@ -752,46 +711,6 @@ where
         minhash_band_centroid_from_refs(&signatures, self.b, self.r)
     }
 
-    // pub fn calculate_centroid_experimental<I>(&self,  ids: I) -> Vec<T>
-    // where
-    //     I: Iterator<Item = Id> {
-    //     let mut bands: Vec<HashSet<&[T]>> = Vec::new();
-    //     for i in 0..self.b {
-    //         bands.push(HashSet::new());
-    //     }
-    //     let mut first_signature = None;
-    //     for id in ids {
-    //         let mut signature = self.id_signatures.get(&id).unwrap();
-    //         for i in 0..self.b {
-    //             let band: &[T] = &signature[self.band_range(i)];
-    //             bands[i].insert(band);
-    //         }
-    //
-    //         match first_signature {
-    //             None => {
-    //                 first_signature.insert(signature);
-    //             }
-    //             Some(_) => {}
-    //         };
-    //     }
-    //     let first_signature = first_signature.unwrap();
-    //     let mut all_ids = HashSet::new();
-    //     let mut centroid_signature = Vec::new();
-    //     for i in 0..self.b {
-    //         let band: &MinHashBand<T, Id, C> = &self.bands[i];
-    //         let band_signatures: Vec<&[T]> = bands[i].iter().map(|k| *k).collect();
-    //         let index = band.find_signature_with_highest_recall(&band_signatures, &mut all_ids);
-    //         match index {
-    //             Some(index) => {
-    //                 centroid_signature.extend_from_slice(band_signatures[index]);
-    //             }
-    //             None => {
-    //                 centroid_signature.extend_from_slice(&first_signature[self.band_range(i)]);
-    //             }
-    //         }
-    //     }
-    //     centroid_signature
-    // }
 
     fn band_range(&self, band_index: usize) -> Range<usize> {
         band_index * self.r..(band_index + 1) * self.r
