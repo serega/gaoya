@@ -1,0 +1,9 @@
+# PyO3 extension modules leave Python symbols (PyUnicode_Type, Py_DecRef, ...)
+# undefined at link time; they are resolved at runtime from the host interpreter.
+# These flags let a plain `cargo build`/`cargo test` link on macOS.
+# (maturin sets this automatically, but bare cargo does not.)
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]

@@ -1,12 +1,13 @@
 use crate::minhash::{compute_minhash_similarity, MinHasher};
-use rand::distributions::{Distribution, Uniform};
+use rand;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use rayon::prelude::*;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher};
 use fnv::FnvBuildHasher;
+use rand::distr::Distribution;
 
 
 #[derive(Clone)]
@@ -39,8 +40,8 @@ impl<B: BuildHasher> MinHasher64V1<B> {
 
     pub fn new_with_hasher_and_seed(num_hashes: usize, build_hasher: B, seed: u64) -> Self {
         let mut rng = StdRng::seed_from_u64(seed);
-        let rand_range1 = Uniform::from(1..MERSENNE_PRIME);
-        let rand_range2 = Uniform::from(0..MERSENNE_PRIME);
+        let mut rand_range1 = rand::distr::Uniform::new(1, MERSENNE_PRIME).unwrap();
+        let mut rand_range2 = rand::distr::Uniform::new(0, MERSENNE_PRIME).unwrap();
         MinHasher64V1 {
             build_hasher,
             a: (0..num_hashes)

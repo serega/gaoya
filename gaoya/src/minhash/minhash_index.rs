@@ -842,9 +842,9 @@ impl<T, Id, C> QueryIndex for MinHashIndex<T, Id, C>
 mod tests {
     use crate::minhash::min_hasher64::MinHasher64V1;
     use crate::minhash::{calculate_b_and_r, calculate_minhash_params, HashSetContainer, IdContainer, MinHasher, MinHashIndex, SmallVecContainer};
-    use rand::distributions::{Distribution, Uniform};
+    use rand::distr::{Distribution, Uniform};
     use rand::prelude::ThreadRng;
-    use rand::{thread_rng, Rng};
+    use rand::Rng;
     use std::borrow::Borrow;
     use std::collections::HashSet;
     use fnv::FnvBuildHasher;
@@ -1012,8 +1012,8 @@ mod tests {
         num_vecs: usize,
         rng: &mut ThreadRng,
     ) -> Vec<Vec<u64>> {
-        let rand_range = Uniform::from(1..100000);
-        let index_rand_range = Uniform::from(0..1000);
+        let rand_range = Uniform::new(1, 100000).unwrap();
+        let index_rand_range = Uniform::new(0, 1000).unwrap();
         (0..num_vecs)
             .map(|_| {
                 let indices: Vec<usize> = (0..num_changes)
@@ -1037,8 +1037,8 @@ mod tests {
         let mut lsh_index: MinHashIndex<u64, u64> = MinHashIndex::new(b, r, 0.5);
 
         let mut vecs = Vec::new();
-        let rand_range = Uniform::from(1..100000);
-        let mut rng = thread_rng();
+        let rand_range = Uniform::new(1, 100000).unwrap();
+        let mut rng = rand::rng();
         let v1: Vec<u64> = (0..1000).map(|_| rand_range.sample(&mut rng)).collect();
         let v2: Vec<u64> = (0..1000).map(|_| rand_range.sample(&mut rng)).collect();
         let v3: Vec<u64> = (0..1000).map(|_| rand_range.sample(&mut rng)).collect();

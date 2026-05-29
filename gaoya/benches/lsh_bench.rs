@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
-use rand::distributions::{Alphanumeric};
-use rand::prelude::{Distribution, StdRng};
+use rand::distr::{Alphanumeric, Distribution};
+use rand::prelude::StdRng;
 use rand::{SeedableRng};
 use gaoya::minhash::{compute_minhash_similarity, MinHasher, MinHasher32, MinHashIndex};
 use gaoya::simhash::{SimHash, SimHashBits, SimHashIndex, SimSipHasher128, SimSipHasher64};

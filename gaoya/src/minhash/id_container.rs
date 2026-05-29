@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::hash::{BuildHasher, Hash};
 use std::ops::Index;
 use std::slice::Iter;
-use smallvec::{Array, SmallVec};
+use smallvec::{ SmallVec};
 use crate::minhash::MinHashType;
 
 /// Container trait to hold point ids in MinHashIndex.
@@ -109,13 +109,13 @@ impl<T: Hash + Eq + Send + Sync + Clone> IdContainer<T> for  VecContainer<T> {
 
 /// SmallVecContainer uses SmallVec backed up by an array
 pub struct SmallVecContainer<T, const N: usize> {
-    vec: SmallVec<[T; N]>
+    vec: SmallVec<T,  N>
 }
 
 impl<T: Hash + Eq + Send + Sync + Clone, const N: usize> IdContainer<T> for SmallVecContainer<T, N> {
     fn new() -> Self {
         SmallVecContainer {
-            vec: SmallVec::<[T; N]>::new()
+            vec: SmallVec::<T, N>::new()
         }
     }
 
