@@ -20,7 +20,7 @@ jobs:
     name: cargo test (gaoya)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --verbose --package gaoya
       - run: cargo test --verbose --package gaoya
@@ -34,12 +34,12 @@ jobs:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - uses: dtolnay/rust-toolchain@stable
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
       - name: Build and test
         working-directory: py-gaoya
         run: |
@@ -56,8 +56,8 @@ jobs:
       matrix:
         target: [x86_64, aarch64]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.9"
       - name: Build wheels
@@ -67,24 +67,22 @@ jobs:
           args: --release --out dist -m py-gaoya/Cargo.toml
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: auto
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: wheels-linux-${{ matrix.target }}
           path: dist
 
   macos:
-    runs-on: ${{ matrix.runner }}
+    # The Intel macos-13 runner has been retired, so build both arches on
+    # Apple Silicon: x86_64 is cross-compiled via the x86_64-apple-darwin target.
+    runs-on: macos-14
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - runner: macos-13
-            target: x86_64
-          - runner: macos-14
-            target: aarch64
+        target: [x86_64, aarch64]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.9"
       - name: Build wheels
@@ -93,7 +91,7 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist -m py-gaoya/Cargo.toml
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: wheels-macos-${{ matrix.target }}
           path: dist
@@ -105,8 +103,8 @@ jobs:
       matrix:
         target: [x64]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.9"
           architecture: ${{ matrix.target }}
@@ -116,7 +114,7 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist -m py-gaoya/Cargo.toml
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: wheels-windows-${{ matrix.target }}
           path: dist
@@ -124,13 +122,13 @@ jobs:
   sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
           args: --out dist -m py-gaoya/Cargo.toml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: wheels-sdist
           path: dist
@@ -146,7 +144,7 @@ jobs:
       contents: write       # create the GitHub release
       attestations: write   # build provenance attestations
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
       - name: Publish to PyPI
         uses: PyO3/maturin-action@v1
         env:
