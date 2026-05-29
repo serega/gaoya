@@ -1,5 +1,5 @@
 
-# [0.2.1] - 2023-06-22
+# [0.2.2] - 2023-06-29
 ### Changed
 - Updated dependencies
 
