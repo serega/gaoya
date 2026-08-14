@@ -14,10 +14,6 @@ pub struct ClusterPointInner<Id> {
     pub cluster: Cell<Option<usize>>
 }
 
-unsafe impl<Id> Send for ClusterPointInner<Id> {}
-unsafe impl<Id> Sync for ClusterPointInner<Id> {}
-
-
 impl<Id> ClusterPointInner<Id> {
 
     pub fn new(id: Id)   -> Self {
