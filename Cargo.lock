@@ -339,7 +339,7 @@ dependencies = [
 
 [[package]]
 name = "gaoya"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "ahash",
  "criterion",
@@ -600,7 +600,7 @@ dependencies = [
 
 [[package]]
 name = "pygaoya"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "fnv",
  "gaoya",
