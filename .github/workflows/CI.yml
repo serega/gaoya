@@ -73,9 +73,9 @@ jobs:
           path: dist
 
   macos:
-    # The Intel macos-13 runner has been retired, so build both arches on
+    # Intel runners and the macos-14 image have been retired, so build both arches on
     # Apple Silicon: x86_64 is cross-compiled via the x86_64-apple-darwin target.
-    runs-on: macos-14
+    runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
