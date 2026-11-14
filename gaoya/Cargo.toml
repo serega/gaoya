@@ -28,19 +28,18 @@ bench = false
 
 [dependencies]
 ahash = "0.8.12"
-rand = "0.10.1"
-rand_pcg = "0.3.1"
+rand = "0.10.3"
 sha-1 = "0.10.1"
 siphasher = "1.0.3"
 random_choice = "0.3.2"
 rayon = "1.12.0"
 seahash = "4.1.0"
-itertools = "0.14.0"
+itertools = "0.15.0"
 num-traits = "0.2.19"
 shingles = "0.1.1"
-smallvec = { version = "2.0.0-alpha.12", features = ["serde"] }
-crossbeam-utils = "0.8.21"
-triomphe = "0.1.15"
+smallvec = { version = "2.0.0-beta.4", features = ["serde"] }
+crossbeam-utils = "0.8.23"
+triomphe = "0.1.17"
 fnv = "1.0.7"
 
 [features]
