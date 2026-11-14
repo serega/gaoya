@@ -1,0 +1,16 @@
+/target
+.DS_Store
+
+# Python build artifacts
+__pycache__/
+*.so
+*.pyd
+.venv/
+/wheels/
+.ipynb_checkpoints/
+py-gaoya/html/
+
+# Editors
+.idea/
+.fleet/
+.vscode/

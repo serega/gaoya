@@ -7,14 +7,15 @@ license = "MIT"
 homepage = "https://github.com/serega/gaoya"
 repository = "https://github.com/serega/gaoya"
 description = "Locality Sensitive Hashing"
+publish = false
 
 [lib]
 name = "gaoya"
 crate-type = ["cdylib"]
 
 [package.metadata.release]
-no-dev-version = true
-disable-publish = true
+tag = false
+publish = false
 
 
 
