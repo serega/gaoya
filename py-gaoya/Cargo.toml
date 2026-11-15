@@ -1,20 +1,21 @@
 [package]
 name = "pygaoya"
-version = "0.2.2"
+version = "0.2.4"
 authors = ["Sergey Melderis <sergey.melderis@gmail.com>"]
 edition = "2024"
 license = "MIT"
 homepage = "https://github.com/serega/gaoya"
 repository = "https://github.com/serega/gaoya"
 description = "Locality Sensitive Hashing"
+publish = false
 
 [lib]
 name = "gaoya"
 crate-type = ["cdylib"]
 
 [package.metadata.release]
-no-dev-version = true
-disable-publish = true
+tag = false
+publish = false
 
 
 

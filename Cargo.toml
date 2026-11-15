@@ -15,3 +15,11 @@ opt-level = 3
 # `debug = true` was previously set on the gaoya crate but was inert (ignored in
 # a virtual workspace). Left off here to keep published wheels small; if you need
 # profiling symbols for `cargo bench`, set `debug = "line-tables-only"`.
+
+# cargo-release: both crates share one version, one release commit and a single
+# `v{{version}}` tag (pygaoya sets `tag = false`). Pushing that tag triggers the
+# CI release job.
+[workspace.metadata.release]
+shared-version = true
+consolidate-commits = true
+tag-name = "v{{version}}"
